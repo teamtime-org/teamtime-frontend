@@ -1,0 +1,576 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Plus, 
+  Search, 
+  Filter, 
+  Calendar, 
+  Users, 
+  Clock, 
+  MoreVertical,
+  Edit,
+  Trash2,
+  Eye,
+  Play,
+  Pause,
+  CheckCircle,
+  Circle,
+  AlertCircle,
+  Timer
+} from 'lucide-react';
+import { 
+  Button, 
+  Input, 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle,
+  Modal,
+  Badge,
+  Loading
+} from '@/components/ui';
+import { useTasks } from '@/hooks/useTasks';
+import { useProjects } from '@/hooks/useProjects';
+import { useAuth } from '@/hooks/useAuth';
+import { ROLES, TASK_STATUS, TASK_PRIORITY } from '@/constants';
+import { formatDate, formatDuration } from '@/utils';
+import TaskForm from './TaskForm';
+
+const statusConfig = {
+  [TASK_STATUS.TODO]: { 
+    variant: 'secondary', 
+    label: 'To Do', 
+    icon: Circle,
+    color: 'text-gray-500' 
+  },
+  [TASK_STATUS.IN_PROGRESS]: { 
+    variant: 'primary', 
+    label: 'In Progress', 
+    icon: Play,
+    color: 'text-blue-500' 
+  },
+  [TASK_STATUS.REVIEW]: { 
+    variant: 'warning', 
+    label: 'Review', 
+    icon: AlertCircle,
+    color: 'text-yellow-500' 
+  },
+  [TASK_STATUS.DONE]: { 
+    variant: 'success', 
+    label: 'Done', 
+    icon: CheckCircle,
+    color: 'text-green-500' 
+  },
+};
+
+const priorityConfig = {
+  [TASK_PRIORITY.LOW]: { variant: 'secondary', label: 'Low', color: 'bg-gray-100' },
+  [TASK_PRIORITY.MEDIUM]: { variant: 'primary', label: 'Medium', color: 'bg-blue-100' },
+  [TASK_PRIORITY.HIGH]: { variant: 'warning', label: 'High', color: 'bg-yellow-100' },
+  [TASK_PRIORITY.URGENT]: { variant: 'danger', label: 'Urgent', color: 'bg-red-100' },
+};
+
+const TasksView = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { projects } = useProjects();
+  const [filters, setFilters] = useState({
+    search: '',
+    status: '',
+    priority: '',
+    projectId: '',
+    assignedTo: '',
+    dueDate: '',
+  });
+  
+  const { tasks, loading, error, pagination, fetchTasks, deleteTask, updateTaskStatus } = useTasks(filters);
+  
+  const [showForm, setShowForm] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState(null);
+  const [viewMode, setViewMode] = useState('grid'); // grid | list | kanban
+
+  const isAdmin = user?.role === ROLES.ADMIN;
+  const isManager = user?.role === ROLES.MANAGER;
+  const canCreateTasks = isAdmin || isManager;
+
+  const handleFilterChange = (key, value) => {
+    const newFilters = { ...filters, [key]: value };
+    setFilters(newFilters);
+    fetchTasks(newFilters);
+  };
+
+  const handleEdit = (task) => {
+    setEditingTask(task);
+    setShowForm(true);
+  };
+
+  const handleDelete = (task) => {
+    setTaskToDelete(task);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await deleteTask(taskToDelete.id);
+      setShowDeleteModal(false);
+      setTaskToDelete(null);
+    } catch (error) {
+      console.error('Error deleting task:', error);
+    }
+  };
+
+  const handleFormClose = () => {
+    setShowForm(false);
+    setEditingTask(null);
+  };
+
+  const handleStatusChange = async (taskId, newStatus) => {
+    try {
+      await updateTaskStatus(taskId, newStatus);
+    } catch (error) {
+      console.error('Error updating task status:', error);
+    }
+  };
+
+  const calculateProgress = (task) => {
+    if (!task.estimatedHours || task.estimatedHours === 0) return 0;
+    const loggedHours = task.loggedHours || 0;
+    return Math.min(Math.round((loggedHours / task.estimatedHours) * 100), 100);
+  };
+
+  const getStatusIcon = (status) => {
+    const config = statusConfig[status];
+    const Icon = config?.icon || Circle;
+    return <Icon className={`h-4 w-4 ${config?.color}`} />;
+  };
+
+  const isOverdue = (task) => {
+    if (!task.dueDate) return false;
+    return new Date(task.dueDate) < new Date() && task.status !== TASK_STATUS.DONE;
+  };
+
+  if (loading && tasks.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loading size="lg" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Tasks</h1>
+          <p className="text-gray-600">
+            Manage and track task progress across your projects
+          </p>
+        </div>
+        <div className="flex items-center space-x-3">
+          {/* View Mode Toggle */}
+          <div className="flex items-center bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'grid' 
+                  ? 'bg-white text-gray-900 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Grid
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'list' 
+                  ? 'bg-white text-gray-900 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              List
+            </button>
+            <button
+              onClick={() => setViewMode('kanban')}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'kanban' 
+                  ? 'bg-white text-gray-900 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Kanban
+            </button>
+          </div>
+
+          {canCreateTasks && (
+            <Button onClick={() => setShowForm(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Task
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center">
+            <Filter className="h-5 w-5 mr-2" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search tasks..."
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            <select
+              value={filters.status}
+              onChange={(e) => handleFilterChange('status', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">All Status</option>
+              <option value={TASK_STATUS.TODO}>To Do</option>
+              <option value={TASK_STATUS.IN_PROGRESS}>In Progress</option>
+              <option value={TASK_STATUS.REVIEW}>Review</option>
+              <option value={TASK_STATUS.DONE}>Done</option>
+            </select>
+
+            <select
+              value={filters.priority}
+              onChange={(e) => handleFilterChange('priority', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">All Priorities</option>
+              <option value={TASK_PRIORITY.LOW}>Low</option>
+              <option value={TASK_PRIORITY.MEDIUM}>Medium</option>
+              <option value={TASK_PRIORITY.HIGH}>High</option>
+              <option value={TASK_PRIORITY.URGENT}>Urgent</option>
+            </select>
+
+            <select
+              value={filters.projectId}
+              onChange={(e) => handleFilterChange('projectId', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">All Projects</option>
+              {projects && projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.assignedTo}
+              onChange={(e) => handleFilterChange('assignedTo', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">All Assignees</option>
+              <option value="me">My Tasks</option>
+              <option value="unassigned">Unassigned</option>
+            </select>
+
+            <Input
+              type="date"
+              placeholder="Due date"
+              value={filters.dueDate}
+              onChange={(e) => handleFilterChange('dueDate', e.target.value)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <p className="text-red-600">{error}</p>
+        </div>
+      )}
+
+      {/* Tasks Grid */}
+      {viewMode === 'grid' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {tasks.map((task) => {
+            const progress = calculateProgress(task);
+            const overdue = isOverdue(task);
+            
+            return (
+              <Card 
+                key={task.id} 
+                className={`hover:shadow-lg transition-shadow ${
+                  overdue ? 'ring-2 ring-red-200' : ''
+                }`}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2 mb-1">
+                        {getStatusIcon(task.status)}
+                        <CardTitle className="text-sm truncate">{task.title}</CardTitle>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge 
+                          variant={priorityConfig[task.priority]?.variant}
+                          className={`${priorityConfig[task.priority]?.color} text-xs`}
+                        >
+                          {priorityConfig[task.priority]?.label}
+                        </Badge>
+                        <Badge variant={statusConfig[task.status]?.variant} className="text-xs">
+                          {statusConfig[task.status]?.label}
+                        </Badge>
+                        {overdue && (
+                          <Badge variant="danger" className="text-xs">
+                            Overdue
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="relative ml-2">
+                      <details className="relative">
+                        <summary className="cursor-pointer p-1 rounded hover:bg-gray-100">
+                          <MoreVertical className="h-4 w-4" />
+                        </summary>
+                        <div className="absolute right-0 z-10 mt-1 w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5">
+                          <button
+                            onClick={() => navigate(`/tasks/${task.id}`)}
+                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </button>
+                          {canCreateTasks && (
+                            <>
+                              <button
+                                onClick={() => handleEdit(task)}
+                                className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDelete(task)}
+                                className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </details>
+                    </div>
+                  </div>
+                </CardHeader>
+                
+                <CardContent>
+                  <p className="text-gray-600 text-xs mb-3 line-clamp-2">
+                    {task.description}
+                  </p>
+
+                  {/* Progress Bar */}
+                  {task.estimatedHours > 0 && (
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-gray-600">Progress</span>
+                        <span className="font-medium">{progress}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-1.5">
+                        <div
+                          className={`h-1.5 rounded-full transition-all ${
+                            progress === 100 ? 'bg-green-500' : 'bg-blue-500'
+                          }`}
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Task Info */}
+                  <div className="space-y-2 text-xs">
+                    {task.project && (
+                      <div className="flex items-center">
+                        <div
+                          className="w-2 h-2 rounded-full mr-2"
+                          style={{ backgroundColor: task.project.area?.color || '#3b82f6' }}
+                        />
+                        <span className="text-gray-600 truncate">{task.project.name}</span>
+                      </div>
+                    )}
+                    
+                    {task.assignedTo && (
+                      <div className="flex items-center">
+                        <Users className="h-3 w-3 mr-2 text-gray-400" />
+                        <span className="text-gray-600">{task.assignedTo.name}</span>
+                      </div>
+                    )}
+                    
+                    {task.dueDate && (
+                      <div className="flex items-center">
+                        <Calendar className="h-3 w-3 mr-2 text-gray-400" />
+                        <span className={`${overdue ? 'text-red-600' : 'text-gray-600'}`}>
+                          {formatDate(task.dueDate)}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {task.estimatedHours && (
+                      <div className="flex items-center">
+                        <Clock className="h-3 w-3 mr-2 text-gray-400" />
+                        <span className="text-gray-600">
+                          {formatDuration(task.estimatedHours)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Status Actions */}
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                    <div className="flex items-center space-x-1">
+                      {task.status !== TASK_STATUS.DONE && (
+                        <button
+                          onClick={() => handleStatusChange(task.id, TASK_STATUS.DONE)}
+                          className="p-1 rounded hover:bg-green-100 text-green-600"
+                          title="Mark as Done"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </button>
+                      )}
+                      {task.status !== TASK_STATUS.IN_PROGRESS && (
+                        <button
+                          onClick={() => handleStatusChange(task.id, TASK_STATUS.IN_PROGRESS)}
+                          className="p-1 rounded hover:bg-blue-100 text-blue-600"
+                          title="Start Progress"
+                        >
+                          <Play className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    
+                    <button
+                      onClick={() => navigate(`/tasks/${task.id}/timer`)}
+                      className="p-1 rounded hover:bg-gray-100 text-gray-600"
+                      title="Time Tracker"
+                    >
+                      <Timer className="h-4 w-4" />
+                    </button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {tasks.length === 0 && !loading && (
+        <div className="text-center py-12">
+          <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+            <Clock className="h-12 w-12 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
+          <p className="text-gray-600 mb-4">
+            {Object.values(filters).some(f => f) 
+              ? 'No tasks match your current filters.'
+              : 'Get started by creating your first task.'
+            }
+          </p>
+          {canCreateTasks && (
+            <Button onClick={() => setShowForm(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Task
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
+            {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
+            {pagination.total} tasks
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagination.page === 1}
+              onClick={() => fetchTasks({ ...filters, page: pagination.page - 1 })}
+            >
+              Previous
+            </Button>
+            <span className="text-sm">
+              Page {pagination.page} of {pagination.totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagination.page === pagination.totalPages}
+              onClick={() => fetchTasks({ ...filters, page: pagination.page + 1 })}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Task Form Modal */}
+      {showForm && (
+        <Modal
+          isOpen={showForm}
+          onClose={handleFormClose}
+          title={editingTask ? 'Edit Task' : 'Create New Task'}
+          size="xl"
+        >
+          <TaskForm
+            task={editingTask}
+            onSuccess={handleFormClose}
+            onCancel={handleFormClose}
+          />
+        </Modal>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <Modal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          title="Delete Task"
+          footer={
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={confirmDelete}
+                loading={loading}
+              >
+                Delete
+              </Button>
+            </>
+          }
+        >
+          <p className="text-gray-600">
+            Are you sure you want to delete the task "{taskToDelete?.title}"? 
+            This action cannot be undone and will remove all associated time entries 
+            and comments.
+          </p>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+export default TasksView;
