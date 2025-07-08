@@ -1,0 +1,74 @@
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+export const APP_NAME = import.meta.env.VITE_APP_NAME || 'TeamTime';
+export const APP_VERSION = import.meta.env.VITE_APP_VERSION || '1.0.0';
+
+export const ROLES = {
+  ADMIN: 'admin',
+  MANAGER: 'manager',
+  EMPLOYEE: 'employee',
+};
+
+export const TASK_STATUS = {
+  TODO: 'todo',
+  IN_PROGRESS: 'in_progress',
+  REVIEW: 'review',
+  DONE: 'done',
+};
+
+export const TASK_PRIORITY = {
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
+  URGENT: 'urgent',
+};
+
+export const PROJECT_STATUS = {
+  ACTIVE: 'active',
+  COMPLETED: 'completed',
+  ON_HOLD: 'on_hold',
+  CANCELLED: 'cancelled',
+};
+
+export const TIMESHEET_STATUS = {
+  DRAFT: 'draft',
+  SUBMITTED: 'submitted',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+};
+
+export const ROUTES = {
+  HOME: '/',
+  LOGIN: '/login',
+  FORGOT_PASSWORD: '/forgot-password',
+  DASHBOARD: '/dashboard',
+  PROJECTS: '/projects',
+  TASKS: '/tasks',
+  TIMESHEET: '/timesheet',
+  USERS: '/users',
+  AREAS: '/areas',
+  REPORTS: '/reports',
+  PROFILE: '/profile',
+};
+
+export const STORAGE_KEYS = {
+  AUTH_TOKEN: 'auth_token',
+  USER_DATA: 'user_data',
+  THEME: 'theme',
+};
+
+export const THEMES = {
+  LIGHT: 'light',
+  DARK: 'dark',
+};
+
+export const DATE_FORMATS = {
+  DISPLAY: 'MMM dd, yyyy',
+  INPUT: 'yyyy-MM-dd',
+  DATETIME: 'MMM dd, yyyy HH:mm',
+  TIME: 'HH:mm',
+};
+
+export const PAGINATION = {
+  DEFAULT_PAGE_SIZE: 10,
+  PAGE_SIZE_OPTIONS: [10, 25, 50, 100],
+};
