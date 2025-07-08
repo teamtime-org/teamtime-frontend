@@ -6,6 +6,8 @@ import GuestRoute from '@/components/guards/GuestRoute';
 import LoginView from '@/views/auth/LoginView';
 import DashboardView from '@/views/dashboard/DashboardView';
 import AreasView from '@/views/areas/AreasView';
+import ProjectsView from '@/views/projects/ProjectsView';
+import ProjectDetailView from '@/views/projects/ProjectDetailView';
 import { ROLES } from '@/constants';
 
 function App() {
@@ -26,7 +28,8 @@ function App() {
           }>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardView />} />
-            <Route path="projects" element={<div>Projects View - Coming Soon</div>} />
+            <Route path="projects" element={<ProjectsView />} />
+            <Route path="projects/:id" element={<ProjectDetailView />} />
             <Route path="tasks" element={<div>Tasks View - Coming Soon</div>} />
             <Route path="timesheet" element={<div>Timesheet View - Coming Soon</div>} />
             <Route path="reports" element={<div>Reports View - Coming Soon</div>} />
