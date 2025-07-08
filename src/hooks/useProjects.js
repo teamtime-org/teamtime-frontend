@@ -31,7 +31,7 @@ export const useProjects = (initialParams = {}) => {
     } finally {
       setLoading(false);
     }
-  }, [initialParams]);
+  }, []); // Remove initialParams dependency to prevent infinite loop
 
   const createProject = async (projectData) => {
     try {
