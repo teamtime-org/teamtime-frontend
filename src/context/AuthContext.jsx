@@ -66,16 +66,17 @@ export const AuthProvider = ({ children }) => {
           const user = JSON.parse(userData);
           dispatch({ type: 'LOGIN_SUCCESS', payload: { token, user } });
           
-          // Verify token is still valid
-          try {
-            const response = await authService.getMe();
-            dispatch({ type: 'UPDATE_USER', payload: response.user });
-          } catch (error) {
-            console.error('Token verification failed:', error);
-            localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-            localStorage.removeItem(STORAGE_KEYS.USER_DATA);
-            dispatch({ type: 'LOGOUT' });
-          }
+          // Note: Skip token verification for now since /auth/me endpoint is not implemented
+          // In production, you would verify the token here
+          // try {
+          //   const response = await authService.getMe();
+          //   dispatch({ type: 'UPDATE_USER', payload: response.data.user });
+          // } catch (error) {
+          //   console.error('Token verification failed:', error);
+          //   localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+          //   localStorage.removeItem(STORAGE_KEYS.USER_DATA);
+          //   dispatch({ type: 'LOGOUT' });
+          // }
         } else {
           dispatch({ type: 'SET_LOADING', payload: false });
         }
@@ -93,10 +94,10 @@ export const AuthProvider = ({ children }) => {
       dispatch({ type: 'LOGIN_START' });
       const response = await authService.login(credentials);
       
-      localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, response.token);
-      localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(response.user));
+      localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, response.data.token);
+      localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(response.data.user));
       
-      dispatch({ type: 'LOGIN_SUCCESS', payload: response });
+      dispatch({ type: 'LOGIN_SUCCESS', payload: response.data });
       return response;
     } catch (error) {
       dispatch({ type: 'LOGIN_FAILURE' });

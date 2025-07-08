@@ -23,10 +23,10 @@ export const TASK_PRIORITY = {
 };
 
 export const PROJECT_STATUS = {
-  ACTIVE: 'active',
-  COMPLETED: 'completed',
-  ON_HOLD: 'on_hold',
-  CANCELLED: 'cancelled',
+  ACTIVE: 'ACTIVE',
+  COMPLETED: 'COMPLETED',
+  ON_HOLD: 'ON_HOLD',
+  CANCELLED: 'CANCELLED',
 };
 
 export const TIMESHEET_STATUS = {
