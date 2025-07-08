@@ -5,6 +5,8 @@ import ProtectedRoute from '@/components/guards/ProtectedRoute';
 import GuestRoute from '@/components/guards/GuestRoute';
 import LoginView from '@/views/auth/LoginView';
 import DashboardView from '@/views/dashboard/DashboardView';
+import AreasView from '@/views/areas/AreasView';
+import { ROLES } from '@/constants';
 
 function App() {
   return (
@@ -29,7 +31,11 @@ function App() {
             <Route path="timesheet" element={<div>Timesheet View - Coming Soon</div>} />
             <Route path="reports" element={<div>Reports View - Coming Soon</div>} />
             <Route path="users" element={<div>Users View - Coming Soon</div>} />
-            <Route path="areas" element={<div>Areas View - Coming Soon</div>} />
+            <Route path="areas" element={
+              <ProtectedRoute requiredRole={ROLES.ADMIN}>
+                <AreasView />
+              </ProtectedRoute>
+            } />
           </Route>
           
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
