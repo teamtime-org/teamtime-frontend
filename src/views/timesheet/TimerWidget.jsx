@@ -211,22 +211,28 @@ const TimerWidget = () => {
               <div>
                 <div className="text-xs font-medium text-gray-600 mb-2">Recent Tasks</div>
                 <div className="space-y-1">
-                  {tasks?.slice(0, 3).map(task => {
-                    const project = projects?.find(p => p.id === task.projectId);
-                    return (
-                      <button
-                        key={task.id}
-                        onClick={() => {
-                          setSelectedTask(task.id);
-                          handleStartTimer();
-                        }}
-                        className="w-full text-left text-xs p-2 hover:bg-gray-50 rounded border border-gray-200"
-                      >
-                        <div className="font-medium">{task.title}</div>
-                        <div className="text-gray-500">{project?.name}</div>
-                      </button>
-                    );
-                  })}
+                  {tasks && tasks.length > 0 ? (
+                    tasks.slice(0, 3).map(task => {
+                      const project = projects?.find(p => p.id === task.projectId);
+                      return (
+                        <button
+                          key={task.id}
+                          onClick={() => {
+                            setSelectedTask(task.id);
+                            handleStartTimer();
+                          }}
+                          className="w-full text-left text-xs p-2 hover:bg-gray-50 rounded border border-gray-200"
+                        >
+                          <div className="font-medium">{task.title}</div>
+                          <div className="text-gray-500">{project?.name}</div>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="text-xs text-gray-500 p-2 border border-gray-200 rounded">
+                      No tasks available. Create some tasks first.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -254,16 +260,25 @@ const TimerWidget = () => {
                 required
               >
                 <option value="">Choose a task...</option>
-                {projects?.map(project => (
-                  <optgroup key={project.id} label={project.name}>
-                    {tasks?.filter(task => task.projectId === project.id).map(task => (
-                      <option key={task.id} value={task.id}>
-                        {task.title}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
+                {projects && projects.length > 0 ? (
+                  projects.map(project => (
+                    <optgroup key={project.id} label={project.name}>
+                      {tasks?.filter(task => task.projectId === project.id).map(task => (
+                        <option key={task.id} value={task.id}>
+                          {task.title}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))
+                ) : (
+                  <option disabled>No projects available</option>
+                )}
               </select>
+              {(!projects || projects.length === 0) && (
+                <p className="text-xs text-gray-500 mt-1">
+                  No projects or tasks available. Create some projects and tasks first.
+                </p>
+              )}
             </div>
 
             <div>

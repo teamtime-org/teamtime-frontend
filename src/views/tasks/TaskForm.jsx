@@ -9,7 +9,7 @@ import { ROLES, TASK_STATUS, TASK_PRIORITY } from '@/constants';
 const TaskForm = ({ task, onSuccess, onCancel }) => {
   const { user } = useAuth();
   const { createTask, updateTask, loading } = useTasks();
-  const { projects } = useProjects();
+  const { projects = [] } = useProjects();
   const [selectedProject, setSelectedProject] = useState(task?.projectId || '');
   const [selectedAssignee, setSelectedAssignee] = useState(task?.assignedToId || '');
 

@@ -21,13 +21,21 @@ export const useTasks = (initialParams = {}) => {
       
       setTasks(response.data?.tasks || []);
       setPagination({
-        page: response.data?.page || 1,
-        limit: response.data?.limit || 10,
-        total: response.data?.total || 0,
-        totalPages: response.data?.totalPages || 0,
+        page: response.data?.pagination?.page || 1,
+        limit: response.data?.pagination?.limit || 10,
+        total: response.data?.pagination?.total || 0,
+        totalPages: response.data?.pagination?.pages || 0,
       });
     } catch (err) {
+      console.error('Error fetching tasks:', err);
       setError(err.response?.data?.message || 'Error loading tasks');
+      setTasks([]);
+      setPagination({
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 0,
+      });
     } finally {
       setLoading(false);
     }
@@ -41,6 +49,7 @@ export const useTasks = (initialParams = {}) => {
       await fetchTasks();
       return response.data;
     } catch (err) {
+      console.error('Error creating task:', err);
       setError(err.response?.data?.message || 'Error creating task');
       throw err;
     } finally {

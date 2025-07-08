@@ -10,8 +10,8 @@ import { ROLES } from '@/constants';
 const TimesheetForm = ({ timesheet, onSuccess, onCancel }) => {
   const { user } = useAuth();
   const { createTimesheet, updateTimesheet, loading } = useTimesheets();
-  const { projects } = useProjects();
-  const { tasks } = useTasks();
+  const { projects = [] } = useProjects();
+  const { tasks = [] } = useTasks();
   const [selectedProject, setSelectedProject] = useState(timesheet?.projectId || '');
   const [selectedTask, setSelectedTask] = useState(timesheet?.taskId || '');
   const [availableTasks, setAvailableTasks] = useState([]);
@@ -101,6 +101,12 @@ const TimesheetForm = ({ timesheet, onSuccess, onCancel }) => {
       onSuccess();
     } catch (error) {
       console.error('Error saving timesheet:', error);
+      // Don't close the modal on error, let user try again
+      if (error.message.includes('Backend not available')) {
+        alert('Backend not available. Timesheet functionality is currently disabled.');
+      } else {
+        alert('Error saving timesheet. Please try again.');
+      }
     }
   };
 
@@ -136,6 +142,30 @@ const TimesheetForm = ({ timesheet, onSuccess, onCancel }) => {
   const availableProjects = isAdmin 
     ? projects 
     : projects?.filter(project => project.areaId === user?.areaId);
+
+  // Show message if no projects are available
+  if (!availableProjects || availableProjects.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+          <h3 className="text-lg font-medium text-yellow-800 mb-2">No Projects Available</h3>
+          <p className="text-yellow-700">
+            You need to have projects available to create timesheet entries. 
+            Please create some projects first or contact your administrator.
+          </p>
+        </div>
+        <div className="flex items-center justify-end space-x-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+          >
+            Close
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
