@@ -11,7 +11,7 @@ export const useAreas = () => {
       setLoading(true);
       setError(null);
       const response = await areaService.getAll();
-      setAreas(response.data || []);
+      setAreas(response.data?.areas || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Error loading areas');
     } finally {

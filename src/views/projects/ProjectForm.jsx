@@ -135,7 +135,7 @@ const ProjectForm = ({ project, onSuccess, onCancel }) => {
             required
           >
             <option value="">Select an area</option>
-            {availableAreas.map((area) => (
+            {availableAreas && availableAreas.map((area) => (
               <option key={area.id} value={area.id}>
                 {area.name}
               </option>
