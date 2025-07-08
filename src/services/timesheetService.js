@@ -3,7 +3,7 @@ import api from '@/services/api';
 export const timesheetService = {
   // Get all timesheets with filtering and pagination
   getAll: async (params = {}) => {
-    const response = await api.get('/timesheets', { params });
+    const response = await api.get('/time-entries', { params });
     return response.data;
   },
 

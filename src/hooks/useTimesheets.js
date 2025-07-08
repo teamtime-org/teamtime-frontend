@@ -19,16 +19,16 @@ export const useTimesheets = (initialParams = {}) => {
       const queryParams = { ...initialParams, ...params };
       const response = await timesheetService.getAll(queryParams);
       
-      setTimesheets(response.data?.timesheets || []);
+      setTimesheets(response.data?.timeEntries || []);
       setPagination({
-        page: response.data?.page || 1,
-        limit: response.data?.limit || 10,
+        page: 1, // Backend no está enviando pagination, usar defaults
+        limit: 10,
         total: response.data?.total || 0,
-        totalPages: response.data?.totalPages || 0,
+        totalPages: Math.ceil((response.data?.total || 0) / 10),
       });
     } catch (err) {
-      console.warn('Timesheets API not available, using mock data');
-      // Provide mock data when backend is not available
+      console.error('Error fetching timesheets:', err);
+      setError(err.response?.data?.message || 'Error loading timesheets');
       setTimesheets([]);
       setPagination({
         page: 1,
@@ -36,7 +36,6 @@ export const useTimesheets = (initialParams = {}) => {
         total: 0,
         totalPages: 0,
       });
-      setError(null); // Don't show error for missing backend endpoints
     } finally {
       setLoading(false);
     }

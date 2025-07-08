@@ -21,10 +21,10 @@ export const useTasks = (initialParams = {}) => {
       
       setTasks(response.data?.tasks || []);
       setPagination({
-        page: response.data?.pagination?.page || 1,
-        limit: response.data?.pagination?.limit || 10,
-        total: response.data?.pagination?.total || 0,
-        totalPages: response.data?.pagination?.pages || 0,
+        page: 1, // Backend no está enviando pagination, usar defaults
+        limit: 10,
+        total: response.data?.total || 0,
+        totalPages: Math.ceil((response.data?.total || 0) / 10),
       });
     } catch (err) {
       console.error('Error fetching tasks:', err);
