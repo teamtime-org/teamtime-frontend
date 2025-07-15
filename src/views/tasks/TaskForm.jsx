@@ -11,7 +11,9 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
   const { createTask, updateTask, loading } = useTasks();
   const { projects = [] } = useProjects();
   const [selectedProject, setSelectedProject] = useState(task?.projectId || '');
-  const [selectedAssignee, setSelectedAssignee] = useState(task?.assignedToId || '');
+  const [selectedAssignee, setSelectedAssignee] = useState(
+    task?.assignedTo?.id || task?.assignedToId || ''
+  );
 
   const {
     register,
@@ -25,7 +27,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
       title: task?.title || '',
       description: task?.description || '',
       projectId: task?.projectId || '',
-      assignedToId: task?.assignedToId || '',
+      assignedToId: task?.assignedTo?.id || task?.assignedToId || '',
       status: task?.status || TASK_STATUS.TODO,
       priority: task?.priority || TASK_PRIORITY.MEDIUM,
       dueDate: task?.dueDate ? task.dueDate.split('T')[0] : '',
@@ -43,7 +45,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
         title: task.title,
         description: task.description,
         projectId: task.projectId,
-        assignedToId: task.assignedToId,
+        assignedToId: task.assignedTo?.id || task.assignedToId || '',
         status: task.status,
         priority: task.priority,
         dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
@@ -51,7 +53,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
         tags: task.tags ? task.tags.join(', ') : '',
       });
       setSelectedProject(task.projectId);
-      setSelectedAssignee(task.assignedToId);
+      setSelectedAssignee(task.assignedTo?.id || task.assignedToId || '');
     }
   }, [task, reset]);
 
@@ -60,7 +62,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
       const taskData = {
         ...data,
         projectId: selectedProject,
-        assignedToId: selectedAssignee || null,
+        assignedTo: selectedAssignee || null,
         estimatedHours: parseInt(data.estimatedHours) || 0,
         dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : null,
         tags: data.tags ? data.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
@@ -75,6 +77,16 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
       onSuccess();
     } catch (error) {
       console.error('Error saving task:', error);
+      
+      // Show better error messages
+      if (error.response?.data?.message) {
+        alert(`Error: ${error.response.data.message}`);
+      } else if (error.response?.data?.errors) {
+        const errorMessages = error.response.data.errors.map(err => err.message).join('\n');
+        alert(`Validation errors:\n${errorMessages}`);
+      } else {
+        alert('Error saving task. Please check all fields and try again.');
+      }
     }
   };
 
@@ -169,21 +181,111 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Assigned To
           </label>
-          <select
-            value={selectedAssignee}
-            onChange={(e) => handleAssigneeChange(e.target.value)}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!selectedProject}
-          >
-            <option value="">Unassigned</option>
-            {availableAssignees.map((assignment) => (
-              <option key={assignment.user.id} value={assignment.user.id}>
-                {assignment.user.name}
-              </option>
-            ))}
-          </select>
-          {!selectedProject && (
-            <p className="text-sm text-gray-500 mt-1">Select a project first</p>
+          <div className={`border border-input rounded-md bg-background ${
+            !selectedProject ? 'opacity-50 cursor-not-allowed' : ''
+          }`}>
+            {!selectedProject ? (
+              <div className="p-3 text-sm text-gray-500">
+                Select a project first to see available assignees
+              </div>
+            ) : availableAssignees.length === 0 ? (
+              <div className="p-3 text-sm text-gray-500">
+                No assignees available for this project
+              </div>
+            ) : (
+              <div className="max-h-[200px] overflow-y-auto">
+                <div className="p-1">
+                  <label className="flex items-center p-2 rounded cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="radio"
+                      name="assignee"
+                      value=""
+                      checked={selectedAssignee === ''}
+                      onChange={() => handleAssigneeChange('')}
+                      className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                    />
+                    <span className="text-sm text-gray-600">Unassigned</span>
+                  </label>
+                  {availableAssignees.map((assignment) => {
+                    // Handle different data structures
+                    const user = assignment.user || assignment;
+                    const userId = user.id || assignment.userId || assignment.id;
+                    const userName = user.firstName && user.lastName 
+                      ? `${user.firstName} ${user.lastName}`
+                      : user.name || user.fullName || `User ${userId}`;
+                    const userEmail = user.email || '';
+                    const userInitial = user.firstName?.charAt(0) || user.name?.charAt(0) || userName?.charAt(0) || '?';
+                    
+                    if (!userId) {
+                      console.warn('Assignment without valid user ID:', assignment);
+                      return null;
+                    }
+                    
+                    const isSelected = selectedAssignee === userId;
+                    return (
+                      <label
+                        key={userId}
+                        className={`flex items-center p-2 rounded cursor-pointer hover:bg-gray-50 ${
+                          isSelected ? 'bg-blue-50 border border-blue-200' : ''
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="assignee"
+                          value={userId}
+                          checked={isSelected}
+                          onChange={() => handleAssigneeChange(userId)}
+                          className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                        />
+                        <div className="flex items-center flex-1">
+                          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-3">
+                            <span className="text-sm font-medium">
+                              {userInitial}
+                            </span>
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {userName}
+                            </div>
+                            {userEmail && (
+                              <div className="text-xs text-gray-500">
+                                {userEmail}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+          {selectedAssignee && (
+            <div className="mt-2">
+              {(() => {
+                const assignment = availableAssignees.find(a => {
+                  const user = a.user || a;
+                  const userId = user.id || a.userId || a.id;
+                  return userId === selectedAssignee;
+                });
+                if (!assignment) return null;
+                
+                const user = assignment.user || assignment;
+                const userName = user.firstName && user.lastName 
+                  ? `${user.firstName} ${user.lastName}`
+                  : user.name || user.fullName || `User ${selectedAssignee}`;
+                
+                return (
+                  <div className="flex items-center text-sm text-gray-600">
+                    <span className="font-medium">Selected:</span>
+                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                      {userName}
+                    </span>
+                  </div>
+                );
+              })()} 
+            </div>
           )}
         </div>
 
@@ -242,21 +344,39 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
           <Input
             label="Due Date"
             type="date"
+            min={selectedProjectData ? new Date(Math.max(Date.now(), new Date(selectedProjectData.startDate))).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
+            max={selectedProjectData ? new Date(selectedProjectData.endDate).toISOString().split('T')[0] : undefined}
             error={errors.dueDate?.message}
             {...register('dueDate', {
               validate: (value) => {
                 if (value && selectedProjectData) {
                   const dueDate = new Date(value);
+                  const projectStartDate = new Date(selectedProjectData.startDate);
                   const projectEndDate = new Date(selectedProjectData.endDate);
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  
+                  if (dueDate < today) {
+                    return 'Due date cannot be in the past';
+                  }
+                  
+                  if (dueDate < projectStartDate) {
+                    return `Due date cannot be before project start (${new Date(projectStartDate).toLocaleDateString()})`;
+                  }
                   
                   if (dueDate > projectEndDate) {
-                    return 'Due date cannot be after project end date';
+                    return `Due date cannot be after project end (${new Date(projectEndDate).toLocaleDateString()})`;
                   }
                 }
                 return true;
               },
             })}
           />
+          {selectedProjectData && (
+            <p className="text-sm text-gray-500 mt-1">
+              Project period: {new Date(selectedProjectData.startDate).toLocaleDateString()} - {new Date(selectedProjectData.endDate).toLocaleDateString()}
+            </p>
+          )}
         </div>
 
         <div className="md:col-span-2">

@@ -62,9 +62,19 @@ export const useTasks = (initialParams = {}) => {
       setLoading(true);
       setError(null);
       const response = await taskService.update(id, taskData);
+      
+      // Actualizar la tarea específica en el estado local con todos los datos
       setTasks(prev => prev.map(task => 
-        task.id === id ? response.data : task
+        task.id === id ? { 
+          ...task, 
+          ...response.data,
+          // Asegurarse de que las relaciones se mantengan si existen
+          project: response.data.project || task.project,
+          assignee: response.data.assignee || task.assignee,
+          creator: response.data.creator || task.creator
+        } : task
       ));
+      
       return response.data;
     } catch (err) {
       setError(err.response?.data?.message || 'Error updating task');
