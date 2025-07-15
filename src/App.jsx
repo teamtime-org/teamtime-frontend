@@ -9,6 +9,8 @@ import AreasView from '@/views/areas/AreasView';
 import ProjectsView from '@/views/projects/ProjectsView';
 import ProjectDetailView from '@/views/projects/ProjectDetailView';
 import { TasksView, TaskDetailView } from '@/views/tasks';
+import { TimesheetView } from '@/views/timesheet';
+import UsersView from '@/views/users/UsersView';
 import { ROLES } from '@/constants';
 
 function App() {
@@ -33,9 +35,14 @@ function App() {
             <Route path="projects/:id" element={<ProjectDetailView />} />
             <Route path="tasks" element={<TasksView />} />
             <Route path="tasks/:id" element={<TaskDetailView />} />
-            <Route path="timesheet" element={<div>Timesheet View - Coming Soon</div>} />
+            <Route path="timesheet" element={<TimesheetView />} />
+            <Route path="timesheet/:id" element={<TimesheetView />} />
             <Route path="reports" element={<div>Reports View - Coming Soon</div>} />
-            <Route path="users" element={<div>Users View - Coming Soon</div>} />
+            <Route path="users" element={
+              <ProtectedRoute requiredRole={ROLES.ADMIN}>
+                <UsersView />
+              </ProtectedRoute>
+            } />
             <Route path="areas" element={
               <ProtectedRoute requiredRole={ROLES.ADMIN}>
                 <AreasView />

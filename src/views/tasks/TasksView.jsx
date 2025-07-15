@@ -289,9 +289,18 @@ const TasksView = () => {
         </CardContent>
       </Card>
 
-      {error && (
+      {error && !error.includes('Backend not available') && (
         <div className="bg-red-50 border border-red-200 rounded-md p-4">
           <p className="text-red-600">{error}</p>
+        </div>
+      )}
+
+      {error && error.includes('Backend not available') && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+          <p className="text-yellow-800">
+            <strong>Backend not available:</strong> Some task features are disabled. 
+            The backend server needs to implement the tasks API endpoints.
+          </p>
         </div>
       )}
 

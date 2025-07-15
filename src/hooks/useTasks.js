@@ -21,13 +21,21 @@ export const useTasks = (initialParams = {}) => {
       
       setTasks(response.data?.tasks || []);
       setPagination({
-        page: response.data?.page || 1,
-        limit: response.data?.limit || 10,
+        page: 1, // Backend no está enviando pagination, usar defaults
+        limit: 10,
         total: response.data?.total || 0,
-        totalPages: response.data?.totalPages || 0,
+        totalPages: Math.ceil((response.data?.total || 0) / 10),
       });
     } catch (err) {
+      console.error('Error fetching tasks:', err);
       setError(err.response?.data?.message || 'Error loading tasks');
+      setTasks([]);
+      setPagination({
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 0,
+      });
     } finally {
       setLoading(false);
     }
@@ -41,6 +49,7 @@ export const useTasks = (initialParams = {}) => {
       await fetchTasks();
       return response.data;
     } catch (err) {
+      console.error('Error creating task:', err);
       setError(err.response?.data?.message || 'Error creating task');
       throw err;
     } finally {
