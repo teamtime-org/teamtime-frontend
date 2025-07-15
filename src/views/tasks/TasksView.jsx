@@ -16,7 +16,9 @@ import {
   CheckCircle,
   Circle,
   AlertCircle,
-  Timer
+  Timer,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { 
   Button, 
@@ -27,7 +29,13 @@ import {
   CardTitle,
   Modal,
   Badge,
-  Loading
+  Loading,
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell
 } from '@/components/ui';
 import { useTasks } from '@/hooks/useTasks';
 import { useProjects } from '@/hooks/useProjects';
@@ -89,7 +97,8 @@ const TasksView = () => {
   const [editingTask, setEditingTask] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState(null);
-  const [viewMode, setViewMode] = useState('grid'); // grid | list | kanban
+  const [viewMode, setViewMode] = useState('list'); // grid | list | kanban
+  const [expandedProjects, setExpandedProjects] = useState(new Set());
 
   const isAdmin = user?.role === ROLES.ADMIN;
   const isManager = user?.role === ROLES.MANAGER;
@@ -126,6 +135,13 @@ const TasksView = () => {
     setEditingTask(null);
   };
 
+  const handleFormSuccess = async () => {
+    setShowForm(false);
+    setEditingTask(null);
+    // Refrescar los datos después de una actualización exitosa
+    await fetchTasks(filters);
+  };
+
   const handleStatusChange = async (taskId, newStatus) => {
     try {
       await updateTaskStatus(taskId, newStatus);
@@ -149,6 +165,38 @@ const TasksView = () => {
   const isOverdue = (task) => {
     if (!task.dueDate) return false;
     return new Date(task.dueDate) < new Date() && task.status !== TASK_STATUS.DONE;
+  };
+
+  const groupTasksByProject = (tasks) => {
+    const grouped = tasks.reduce((acc, task) => {
+      const projectKey = task.project?.id || 'no-project';
+      
+      if (!acc[projectKey]) {
+        acc[projectKey] = {
+          project: task.project || { name: 'No Project', id: 'no-project' },
+          tasks: []
+        };
+      }
+      
+      acc[projectKey].tasks.push(task);
+      return acc;
+    }, {});
+
+    return Object.values(grouped).sort((a, b) => {
+      if (a.project.id === 'no-project') return 1;
+      if (b.project.id === 'no-project') return -1;
+      return a.project.name.localeCompare(b.project.name);
+    });
+  };
+
+  const toggleProjectExpansion = (projectId) => {
+    const newExpanded = new Set(expandedProjects);
+    if (newExpanded.has(projectId)) {
+      newExpanded.delete(projectId);
+    } else {
+      newExpanded.add(projectId);
+    }
+    setExpandedProjects(newExpanded);
   };
 
   if (loading && tasks.length === 0) {
@@ -478,6 +526,256 @@ const TasksView = () => {
         </div>
       )}
 
+      {/* Tasks Summary */}
+      {viewMode === 'list' && tasks.length > 0 && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+              <div>
+                <div className="text-2xl font-bold text-blue-600">{tasks.length}</div>
+                <div className="text-sm text-gray-600">Total Tasks</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-green-600">
+                  {tasks.filter(t => t.status === TASK_STATUS.DONE).length}
+                </div>
+                <div className="text-sm text-gray-600">Completed</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-yellow-600">
+                  {tasks.filter(t => t.status === TASK_STATUS.IN_PROGRESS).length}
+                </div>
+                <div className="text-sm text-gray-600">In Progress</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-red-600">
+                  {tasks.filter(t => isOverdue(t)).length}
+                </div>
+                <div className="text-sm text-gray-600">Overdue</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Tasks List View */}
+      {viewMode === 'list' && (
+        <div className="space-y-6">
+          {/* List Controls */}
+          {tasks.length > 0 && (
+            <div className="flex justify-between items-center">
+              <div className="text-sm text-gray-600">
+                {groupTasksByProject(tasks).length} project{groupTasksByProject(tasks).length !== 1 ? 's' : ''} found
+              </div>
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const allProjects = groupTasksByProject(tasks).map(g => g.project.id);
+                    setExpandedProjects(new Set(allProjects));
+                  }}
+                >
+                  Expand All
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setExpandedProjects(new Set())}
+                >
+                  Collapse All
+                </Button>
+              </div>
+            </div>
+          )}
+          {groupTasksByProject(tasks).map((group) => {
+            const isExpanded = expandedProjects.has(group.project.id);
+            const completedTasks = group.tasks.filter(t => t.status === TASK_STATUS.DONE).length;
+            const overdueTasks = group.tasks.filter(t => isOverdue(t)).length;
+            
+            return (
+              <Card key={group.project.id}>
+                <CardHeader className="pb-3">
+                  <CardTitle 
+                    className="flex items-center text-lg cursor-pointer hover:bg-gray-50 -m-4 p-4 rounded-lg"
+                    onClick={() => toggleProjectExpansion(group.project.id)}
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="h-5 w-5 mr-2 text-gray-500" />
+                    ) : (
+                      <ChevronRight className="h-5 w-5 mr-2 text-gray-500" />
+                    )}
+                    {group.project.area && (
+                      <div
+                        className="w-3 h-3 rounded-full mr-3"
+                        style={{ backgroundColor: group.project.area.color || '#3b82f6' }}
+                      />
+                    )}
+                    <span className="flex-1">{group.project.name}</span>
+                    <div className="flex items-center space-x-2 ml-auto">
+                      {overdueTasks > 0 && (
+                        <Badge variant="danger" className="text-xs">
+                          {overdueTasks} overdue
+                        </Badge>
+                      )}
+                      <Badge variant="success" className="text-xs">
+                        {completedTasks}/{group.tasks.length} done
+                      </Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        {group.tasks.length} task{group.tasks.length !== 1 ? 's' : ''}
+                      </Badge>
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                {isExpanded && (
+                  <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-8"></TableHead>
+                      <TableHead>Task</TableHead>
+                      <TableHead className="w-24">Priority</TableHead>
+                      <TableHead className="w-24">Status</TableHead>
+                      <TableHead className="w-32">Assignee</TableHead>
+                      <TableHead className="w-24">Due Date</TableHead>
+                      <TableHead className="w-20">Progress</TableHead>
+                      <TableHead className="w-20">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {group.tasks.map((task) => {
+                      const progress = calculateProgress(task);
+                      const overdue = isOverdue(task);
+                      
+                      return (
+                        <TableRow key={task.id} className={overdue ? 'bg-red-50' : ''}>
+                          <TableCell>
+                            {getStatusIcon(task.status)}
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium text-sm">{task.title}</div>
+                              {task.description && (
+                                <div className="text-xs text-gray-500 truncate max-w-xs">
+                                  {task.description}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={priorityConfig[task.priority]?.variant}
+                              className="text-xs"
+                            >
+                              {priorityConfig[task.priority]?.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={statusConfig[task.status]?.variant} className="text-xs">
+                              {statusConfig[task.status]?.label}
+                            </Badge>
+                            {overdue && (
+                              <Badge variant="danger" className="text-xs ml-1">
+                                Overdue
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center">
+                              {task.assignedTo ? (
+                                <>
+                                  <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center mr-2">
+                                    <span className="text-xs font-medium">
+                                      {task.assignedTo.firstName?.charAt(0) || task.assignedTo.name?.charAt(0) || '?'}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs text-gray-600 truncate">
+                                    {task.assignedTo.firstName && task.assignedTo.lastName 
+                                      ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}`
+                                      : task.assignedTo.name || 'Unknown'
+                                    }
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-xs text-gray-400">Unassigned</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {task.dueDate ? (
+                              <span className={`text-xs ${overdue ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
+                                {formatDate(task.dueDate)}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-400">No due date</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {task.estimatedHours > 0 ? (
+                              <div className="flex items-center space-x-2">
+                                <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                                  <div
+                                    className={`h-1.5 rounded-full transition-all ${
+                                      progress === 100 ? 'bg-green-500' : 'bg-blue-500'
+                                    }`}
+                                    style={{ width: `${progress}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs text-gray-600 w-8">{progress}%</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-gray-400">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-1">
+                              <button
+                                onClick={() => navigate(`/tasks/${task.id}`)}
+                                className="p-1 rounded hover:bg-gray-100 text-gray-600"
+                                title="View Details"
+                              >
+                                <Eye className="h-3 w-3" />
+                              </button>
+                              {canCreateTasks && (
+                                <>
+                                  <button
+                                    onClick={() => handleEdit(task)}
+                                    className="p-1 rounded hover:bg-gray-100 text-gray-600"
+                                    title="Edit"
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(task)}
+                                    className="p-1 rounded hover:bg-red-100 text-red-600"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </>
+                              )}
+                              <button
+                                onClick={() => navigate(`/tasks/${task.id}/timer`)}
+                                className="p-1 rounded hover:bg-gray-100 text-gray-600"
+                                title="Time Tracker"
+                              >
+                                <Timer className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+                  </CardContent>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
       {tasks.length === 0 && !loading && (
         <div className="text-center py-12">
           <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -541,7 +839,7 @@ const TasksView = () => {
         >
           <TaskForm
             task={editingTask}
-            onSuccess={handleFormClose}
+            onSuccess={handleFormSuccess}
             onCancel={handleFormClose}
           />
         </Modal>
