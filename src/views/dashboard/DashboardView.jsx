@@ -1,34 +1,49 @@
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { Clock, FolderOpen, CheckSquare, Users } from 'lucide-react';
 
 const DashboardView = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
+
+  // Obtener el nombre del usuario de manera más robusta
+  const getUserName = () => {
+    if (!user) return 'Usuario';
+
+    // Intentar diferentes campos que podrían contener el nombre
+    return user.name ||
+      user.firstName ||
+      user.fullName ||
+      `${user.firstName || ''} ${user.lastName || ''}`.trim() ||
+      user.email?.split('@')[0] ||
+      'Usuario';
+  };
 
   const stats = [
     {
-      title: 'Total Projects',
+      title: t('totalProjects'),
       value: '12',
       icon: FolderOpen,
       color: 'text-blue-600',
       bg: 'bg-blue-100',
     },
     {
-      title: 'Active Tasks',
+      title: t('activeTasks'),
       value: '24',
       icon: CheckSquare,
       color: 'text-green-600',
       bg: 'bg-green-100',
     },
     {
-      title: 'Hours This Week',
+      title: t('hoursThisWeek'),
       value: '32.5',
       icon: Clock,
       color: 'text-purple-600',
       bg: 'bg-purple-100',
     },
     {
-      title: 'Team Members',
+      title: t('teamMembers'),
       value: '8',
       icon: Users,
       color: 'text-orange-600',
@@ -40,10 +55,10 @@ const DashboardView = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">
-          Welcome back, {user?.name}!
+          {t('welcomeBackUser', { name: getUserName() })}
         </h1>
         <p className="text-gray-600">
-          Here's what's happening with your projects today.
+          {t('whatsHappening')}
         </p>
       </div>
 
@@ -68,35 +83,35 @@ const DashboardView = () => {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Recent Projects</CardTitle>
+            <CardTitle>{t('recentProjects')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium">Website Redesign</p>
-                  <p className="text-sm text-gray-500">Last updated 2 hours ago</p>
+                  <p className="font-medium">Rediseño de Sitio Web</p>
+                  <p className="text-sm text-gray-500">Última actualización hace 2 horas</p>
                 </div>
                 <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                  Active
+                  {t('active')}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium">Mobile App</p>
-                  <p className="text-sm text-gray-500">Last updated 1 day ago</p>
+                  <p className="font-medium">Aplicación Móvil</p>
+                  <p className="text-sm text-gray-500">Última actualización hace 1 día</p>
                 </div>
                 <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
-                  In Progress
+                  {t('inProgress')}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium">Database Migration</p>
-                  <p className="text-sm text-gray-500">Last updated 3 days ago</p>
+                  <p className="font-medium">Migración de Base de Datos</p>
+                  <p className="text-sm text-gray-500">Última actualización hace 3 días</p>
                 </div>
                 <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
-                  Planning
+                  {t('planning')}
                 </span>
               </div>
             </div>
@@ -105,7 +120,7 @@ const DashboardView = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+            <CardTitle>{t('recentActivity')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -115,9 +130,9 @@ const DashboardView = () => {
                 </div>
                 <div>
                   <p className="text-sm">
-                    <span className="font-medium">John Doe</span> completed task "Update homepage"
+                    <span className="font-medium">Juan Pérez</span> {t('activityCompleted')} tarea "Actualizar página principal"
                   </p>
-                  <p className="text-xs text-gray-500">2 hours ago</p>
+                  <p className="text-xs text-gray-500">hace 2 horas</p>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
@@ -126,9 +141,9 @@ const DashboardView = () => {
                 </div>
                 <div>
                   <p className="text-sm">
-                    <span className="font-medium">Jane Smith</span> added new task "Review design mockups"
+                    <span className="font-medium">María García</span> {t('activityAdded')} {t('activityNewTask')} "Revisar maquetas de diseño"
                   </p>
-                  <p className="text-xs text-gray-500">4 hours ago</p>
+                  <p className="text-xs text-gray-500">hace 4 horas</p>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
@@ -137,9 +152,9 @@ const DashboardView = () => {
                 </div>
                 <div>
                   <p className="text-sm">
-                    <span className="font-medium">Team</span> meeting scheduled for tomorrow
+                    <span className="font-medium">{t('team')}</span> {t('activityMeeting')} {t('activityScheduled')} {t('activityFor')} {t('tomorrow')}
                   </p>
-                  <p className="text-xs text-gray-500">1 day ago</p>
+                  <p className="text-xs text-gray-500">hace 1 día</p>
                 </div>
               </div>
             </div>

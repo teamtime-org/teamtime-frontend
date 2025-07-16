@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Calendar, 
-  Users, 
-  Clock, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Calendar,
+  Users,
+  Clock,
   MoreVertical,
   Edit,
   Trash2,
@@ -20,12 +20,12 @@ import {
   ChevronDown,
   ChevronRight
 } from 'lucide-react';
-import { 
-  Button, 
-  Input, 
-  Card, 
-  CardContent, 
-  CardHeader, 
+import {
+  Button,
+  Input,
+  Card,
+  CardContent,
+  CardHeader,
   CardTitle,
   Modal,
   Badge,
@@ -40,48 +40,50 @@ import {
 import { useTasks } from '@/hooks/useTasks';
 import { useProjects } from '@/hooks/useProjects';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/hooks/useTranslation';
 import { ROLES, TASK_STATUS, TASK_PRIORITY } from '@/constants';
 import { formatDate, formatDuration } from '@/utils';
 import TaskForm from './TaskForm';
 
-const statusConfig = {
-  [TASK_STATUS.TODO]: { 
-    variant: 'secondary', 
-    label: 'To Do', 
-    icon: Circle,
-    color: 'text-gray-500' 
-  },
-  [TASK_STATUS.IN_PROGRESS]: { 
-    variant: 'primary', 
-    label: 'In Progress', 
-    icon: Play,
-    color: 'text-blue-500' 
-  },
-  [TASK_STATUS.REVIEW]: { 
-    variant: 'warning', 
-    label: 'Review', 
-    icon: AlertCircle,
-    color: 'text-yellow-500' 
-  },
-  [TASK_STATUS.DONE]: { 
-    variant: 'success', 
-    label: 'Done', 
-    icon: CheckCircle,
-    color: 'text-green-500' 
-  },
-};
-
-const priorityConfig = {
-  [TASK_PRIORITY.LOW]: { variant: 'secondary', label: 'Low', color: 'bg-gray-100' },
-  [TASK_PRIORITY.MEDIUM]: { variant: 'primary', label: 'Medium', color: 'bg-blue-100' },
-  [TASK_PRIORITY.HIGH]: { variant: 'warning', label: 'High', color: 'bg-yellow-100' },
-  [TASK_PRIORITY.URGENT]: { variant: 'danger', label: 'Urgent', color: 'bg-red-100' },
-};
-
 const TasksView = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const { projects } = useProjects();
+
+  const statusConfig = {
+    [TASK_STATUS.TODO]: {
+      variant: 'secondary',
+      label: 'Pendiente',
+      icon: Circle,
+      color: 'text-gray-500'
+    },
+    [TASK_STATUS.IN_PROGRESS]: {
+      variant: 'primary',
+      label: t('inProgress'),
+      icon: Play,
+      color: 'text-blue-500'
+    },
+    [TASK_STATUS.REVIEW]: {
+      variant: 'warning',
+      label: t('review'),
+      icon: AlertCircle,
+      color: 'text-yellow-500'
+    },
+    [TASK_STATUS.DONE]: {
+      variant: 'success',
+      label: t('done'),
+      icon: CheckCircle,
+      color: 'text-green-500'
+    },
+  };
+
+  const priorityConfig = {
+    [TASK_PRIORITY.LOW]: { variant: 'secondary', label: t('low'), color: 'bg-gray-100' },
+    [TASK_PRIORITY.MEDIUM]: { variant: 'primary', label: t('medium'), color: 'bg-blue-100' },
+    [TASK_PRIORITY.HIGH]: { variant: 'warning', label: t('high'), color: 'bg-yellow-100' },
+    [TASK_PRIORITY.URGENT]: { variant: 'danger', label: t('urgent'), color: 'bg-red-100' },
+  };
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -90,9 +92,9 @@ const TasksView = () => {
     assignedTo: '',
     dueDate: '',
   });
-  
+
   const { tasks, loading, error, pagination, fetchTasks, deleteTask, updateTaskStatus } = useTasks(filters);
-  
+
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -170,14 +172,14 @@ const TasksView = () => {
   const groupTasksByProject = (tasks) => {
     const grouped = tasks.reduce((acc, task) => {
       const projectKey = task.project?.id || 'no-project';
-      
+
       if (!acc[projectKey]) {
         acc[projectKey] = {
           project: task.project || { name: 'No Project', id: 'no-project' },
           tasks: []
         };
       }
-      
+
       acc[projectKey].tasks.push(task);
       return acc;
     }, {});
@@ -221,31 +223,28 @@ const TasksView = () => {
           <div className="flex items-center bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => setViewMode('grid')}
-              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'grid' 
-                  ? 'bg-white text-gray-900 shadow-sm' 
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === 'grid'
+                  ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
-              }`}
+                }`}
             >
               Grid
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'list' 
-                  ? 'bg-white text-gray-900 shadow-sm' 
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === 'list'
+                  ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
-              }`}
+                }`}
             >
               List
             </button>
             <button
               onClick={() => setViewMode('kanban')}
-              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'kanban' 
-                  ? 'bg-white text-gray-900 shadow-sm' 
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === 'kanban'
+                  ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
-              }`}
+                }`}
             >
               Kanban
             </button>
@@ -279,7 +278,7 @@ const TasksView = () => {
                 className="pl-10"
               />
             </div>
-            
+
             <select
               value={filters.status}
               onChange={(e) => handleFilterChange('status', e.target.value)}
@@ -346,7 +345,7 @@ const TasksView = () => {
       {error && error.includes('Backend not available') && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
           <p className="text-yellow-800">
-            <strong>Backend not available:</strong> Some task features are disabled. 
+            <strong>Backend not available:</strong> Some task features are disabled.
             The backend server needs to implement the tasks API endpoints.
           </p>
         </div>
@@ -358,13 +357,12 @@ const TasksView = () => {
           {tasks.map((task) => {
             const progress = calculateProgress(task);
             const overdue = isOverdue(task);
-            
+
             return (
-              <Card 
-                key={task.id} 
-                className={`hover:shadow-lg transition-shadow ${
-                  overdue ? 'ring-2 ring-red-200' : ''
-                }`}
+              <Card
+                key={task.id}
+                className={`hover:shadow-lg transition-shadow ${overdue ? 'ring-2 ring-red-200' : ''
+                  }`}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
@@ -374,7 +372,7 @@ const TasksView = () => {
                         <CardTitle className="text-sm truncate">{task.title}</CardTitle>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Badge 
+                        <Badge
                           variant={priorityConfig[task.priority]?.variant}
                           className={`${priorityConfig[task.priority]?.color} text-xs`}
                         >
@@ -426,7 +424,7 @@ const TasksView = () => {
                     </div>
                   </div>
                 </CardHeader>
-                
+
                 <CardContent>
                   <p className="text-gray-600 text-xs mb-3 line-clamp-2">
                     {task.description}
@@ -441,9 +439,8 @@ const TasksView = () => {
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-1.5">
                         <div
-                          className={`h-1.5 rounded-full transition-all ${
-                            progress === 100 ? 'bg-green-500' : 'bg-blue-500'
-                          }`}
+                          className={`h-1.5 rounded-full transition-all ${progress === 100 ? 'bg-green-500' : 'bg-blue-500'
+                            }`}
                           style={{ width: `${progress}%` }}
                         />
                       </div>
@@ -461,14 +458,14 @@ const TasksView = () => {
                         <span className="text-gray-600 truncate">{task.project.name}</span>
                       </div>
                     )}
-                    
+
                     {task.assignedTo && (
                       <div className="flex items-center">
                         <Users className="h-3 w-3 mr-2 text-gray-400" />
                         <span className="text-gray-600">{task.assignedTo.name}</span>
                       </div>
                     )}
-                    
+
                     {task.dueDate && (
                       <div className="flex items-center">
                         <Calendar className="h-3 w-3 mr-2 text-gray-400" />
@@ -477,7 +474,7 @@ const TasksView = () => {
                         </span>
                       </div>
                     )}
-                    
+
                     {task.estimatedHours && (
                       <div className="flex items-center">
                         <Clock className="h-3 w-3 mr-2 text-gray-400" />
@@ -510,7 +507,7 @@ const TasksView = () => {
                         </button>
                       )}
                     </div>
-                    
+
                     <button
                       onClick={() => navigate(`/tasks/${task.id}/timer`)}
                       className="p-1 rounded hover:bg-gray-100 text-gray-600"
@@ -592,11 +589,11 @@ const TasksView = () => {
             const isExpanded = expandedProjects.has(group.project.id);
             const completedTasks = group.tasks.filter(t => t.status === TASK_STATUS.DONE).length;
             const overdueTasks = group.tasks.filter(t => isOverdue(t)).length;
-            
+
             return (
               <Card key={group.project.id}>
                 <CardHeader className="pb-3">
-                  <CardTitle 
+                  <CardTitle
                     className="flex items-center text-lg cursor-pointer hover:bg-gray-50 -m-4 p-4 rounded-lg"
                     onClick={() => toggleProjectExpansion(group.project.id)}
                   >
@@ -629,145 +626,144 @@ const TasksView = () => {
                 </CardHeader>
                 {isExpanded && (
                   <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-8"></TableHead>
-                      <TableHead>Task</TableHead>
-                      <TableHead className="w-24">Priority</TableHead>
-                      <TableHead className="w-24">Status</TableHead>
-                      <TableHead className="w-32">Assignee</TableHead>
-                      <TableHead className="w-24">Due Date</TableHead>
-                      <TableHead className="w-20">Progress</TableHead>
-                      <TableHead className="w-20">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {group.tasks.map((task) => {
-                      const progress = calculateProgress(task);
-                      const overdue = isOverdue(task);
-                      
-                      return (
-                        <TableRow key={task.id} className={overdue ? 'bg-red-50' : ''}>
-                          <TableCell>
-                            {getStatusIcon(task.status)}
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium text-sm">{task.title}</div>
-                              {task.description && (
-                                <div className="text-xs text-gray-500 truncate max-w-xs">
-                                  {task.description}
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant={priorityConfig[task.priority]?.variant}
-                              className="text-xs"
-                            >
-                              {priorityConfig[task.priority]?.label}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={statusConfig[task.status]?.variant} className="text-xs">
-                              {statusConfig[task.status]?.label}
-                            </Badge>
-                            {overdue && (
-                              <Badge variant="danger" className="text-xs ml-1">
-                                Overdue
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center">
-                              {task.assignedTo ? (
-                                <>
-                                  <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center mr-2">
-                                    <span className="text-xs font-medium">
-                                      {task.assignedTo.firstName?.charAt(0) || task.assignedTo.name?.charAt(0) || '?'}
-                                    </span>
-                                  </div>
-                                  <span className="text-xs text-gray-600 truncate">
-                                    {task.assignedTo.firstName && task.assignedTo.lastName 
-                                      ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}`
-                                      : task.assignedTo.name || 'Unknown'
-                                    }
-                                  </span>
-                                </>
-                              ) : (
-                                <span className="text-xs text-gray-400">Unassigned</span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {task.dueDate ? (
-                              <span className={`text-xs ${overdue ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
-                                {formatDate(task.dueDate)}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-gray-400">No due date</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {task.estimatedHours > 0 ? (
-                              <div className="flex items-center space-x-2">
-                                <div className="w-12 bg-gray-200 rounded-full h-1.5">
-                                  <div
-                                    className={`h-1.5 rounded-full transition-all ${
-                                      progress === 100 ? 'bg-green-500' : 'bg-blue-500'
-                                    }`}
-                                    style={{ width: `${progress}%` }}
-                                  />
-                                </div>
-                                <span className="text-xs text-gray-600 w-8">{progress}%</span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-gray-400">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-1">
-                              <button
-                                onClick={() => navigate(`/tasks/${task.id}`)}
-                                className="p-1 rounded hover:bg-gray-100 text-gray-600"
-                                title="View Details"
-                              >
-                                <Eye className="h-3 w-3" />
-                              </button>
-                              {canCreateTasks && (
-                                <>
-                                  <button
-                                    onClick={() => handleEdit(task)}
-                                    className="p-1 rounded hover:bg-gray-100 text-gray-600"
-                                    title="Edit"
-                                  >
-                                    <Edit className="h-3 w-3" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDelete(task)}
-                                    className="p-1 rounded hover:bg-red-100 text-red-600"
-                                    title="Delete"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </button>
-                                </>
-                              )}
-                              <button
-                                onClick={() => navigate(`/tasks/${task.id}/timer`)}
-                                className="p-1 rounded hover:bg-gray-100 text-gray-600"
-                                title="Time Tracker"
-                              >
-                                <Timer className="h-3 w-3" />
-                              </button>
-                            </div>
-                          </TableCell>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-8"></TableHead>
+                          <TableHead>Task</TableHead>
+                          <TableHead className="w-24">Priority</TableHead>
+                          <TableHead className="w-24">Status</TableHead>
+                          <TableHead className="w-32">Assignee</TableHead>
+                          <TableHead className="w-24">Due Date</TableHead>
+                          <TableHead className="w-20">Progress</TableHead>
+                          <TableHead className="w-20">Actions</TableHead>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {group.tasks.map((task) => {
+                          const progress = calculateProgress(task);
+                          const overdue = isOverdue(task);
+
+                          return (
+                            <TableRow key={task.id} className={overdue ? 'bg-red-50' : ''}>
+                              <TableCell>
+                                {getStatusIcon(task.status)}
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium text-sm">{task.title}</div>
+                                  {task.description && (
+                                    <div className="text-xs text-gray-500 truncate max-w-xs">
+                                      {task.description}
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={priorityConfig[task.priority]?.variant}
+                                  className="text-xs"
+                                >
+                                  {priorityConfig[task.priority]?.label}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={statusConfig[task.status]?.variant} className="text-xs">
+                                  {statusConfig[task.status]?.label}
+                                </Badge>
+                                {overdue && (
+                                  <Badge variant="danger" className="text-xs ml-1">
+                                    Overdue
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center">
+                                  {task.assignedTo ? (
+                                    <>
+                                      <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center mr-2">
+                                        <span className="text-xs font-medium">
+                                          {task.assignedTo.firstName?.charAt(0) || task.assignedTo.name?.charAt(0) || '?'}
+                                        </span>
+                                      </div>
+                                      <span className="text-xs text-gray-600 truncate">
+                                        {task.assignedTo.firstName && task.assignedTo.lastName
+                                          ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}`
+                                          : task.assignedTo.name || 'Unknown'
+                                        }
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="text-xs text-gray-400">Unassigned</span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {task.dueDate ? (
+                                  <span className={`text-xs ${overdue ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
+                                    {formatDate(task.dueDate)}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-gray-400">No due date</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {task.estimatedHours > 0 ? (
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                                      <div
+                                        className={`h-1.5 rounded-full transition-all ${progress === 100 ? 'bg-green-500' : 'bg-blue-500'
+                                          }`}
+                                        style={{ width: `${progress}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-xs text-gray-600 w-8">{progress}%</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-gray-400">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center space-x-1">
+                                  <button
+                                    onClick={() => navigate(`/tasks/${task.id}`)}
+                                    className="p-1 rounded hover:bg-gray-100 text-gray-600"
+                                    title="View Details"
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                  </button>
+                                  {canCreateTasks && (
+                                    <>
+                                      <button
+                                        onClick={() => handleEdit(task)}
+                                        className="p-1 rounded hover:bg-gray-100 text-gray-600"
+                                        title="Edit"
+                                      >
+                                        <Edit className="h-3 w-3" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDelete(task)}
+                                        className="p-1 rounded hover:bg-red-100 text-red-600"
+                                        title="Delete"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    </>
+                                  )}
+                                  <button
+                                    onClick={() => navigate(`/tasks/${task.id}/timer`)}
+                                    className="p-1 rounded hover:bg-gray-100 text-gray-600"
+                                    title="Time Tracker"
+                                  >
+                                    <Timer className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
                   </CardContent>
                 )}
               </Card>
@@ -783,7 +779,7 @@ const TasksView = () => {
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
           <p className="text-gray-600 mb-4">
-            {Object.values(filters).some(f => f) 
+            {Object.values(filters).some(f => f)
               ? 'No tasks match your current filters.'
               : 'Get started by creating your first task.'
             }
@@ -870,8 +866,8 @@ const TasksView = () => {
           }
         >
           <p className="text-gray-600">
-            Are you sure you want to delete the task "{taskToDelete?.title}"? 
-            This action cannot be undone and will remove all associated time entries 
+            Are you sure you want to delete the task "{taskToDelete?.title}"?
+            This action cannot be undone and will remove all associated time entries
             and comments.
           </p>
         </Modal>

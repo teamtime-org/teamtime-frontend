@@ -1,23 +1,23 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Calendar, 
-  Users, 
-  Clock, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Calendar,
+  Users,
+  Clock,
   MoreVertical,
   Edit,
   Trash2,
   Eye
 } from 'lucide-react';
-import { 
-  Button, 
-  Input, 
-  Card, 
-  CardContent, 
-  CardHeader, 
+import {
+  Button,
+  Input,
+  Card,
+  CardContent,
+  CardHeader,
   CardTitle,
   Modal,
   Badge,
@@ -26,37 +26,39 @@ import {
 import { useProjects } from '@/hooks/useProjects';
 import { useAreas } from '@/hooks/useAreas';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/hooks/useTranslation';
 import { ROLES, PROJECT_STATUS } from '@/constants';
 import { formatDate, formatDuration } from '@/utils';
 import ProjectForm from './ProjectForm';
 
-const statusConfig = {
-  [PROJECT_STATUS.ACTIVE]: { variant: 'success', label: 'Active' },
-  [PROJECT_STATUS.COMPLETED]: { variant: 'default', label: 'Completed' },
-  [PROJECT_STATUS.ON_HOLD]: { variant: 'warning', label: 'On Hold' },
-  [PROJECT_STATUS.CANCELLED]: { variant: 'danger', label: 'Cancelled' },
-};
-
-const priorityConfig = {
-  LOW: { variant: 'secondary', label: 'Low' },
-  MEDIUM: { variant: 'default', label: 'Medium' },
-  HIGH: { variant: 'warning', label: 'High' },
-  URGENT: { variant: 'danger', label: 'Urgent' },
-};
-
 const ProjectsView = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const { areas } = useAreas();
+
+  const statusConfig = {
+    [PROJECT_STATUS.ACTIVE]: { variant: 'success', label: t('active') },
+    [PROJECT_STATUS.COMPLETED]: { variant: 'default', label: t('completed') },
+    [PROJECT_STATUS.ON_HOLD]: { variant: 'warning', label: t('onHold') },
+    [PROJECT_STATUS.CANCELLED]: { variant: 'danger', label: t('cancelled') },
+  };
+
+  const priorityConfig = {
+    LOW: { variant: 'secondary', label: t('low') },
+    MEDIUM: { variant: 'default', label: t('medium') },
+    HIGH: { variant: 'warning', label: t('high') },
+    URGENT: { variant: 'danger', label: t('urgent') },
+  };
   const [filters, setFilters] = useState({
     search: '',
     status: '',
     priority: '',
     areaId: '',
   });
-  
+
   const { projects, loading, error, pagination, fetchProjects, deleteProject } = useProjects(filters);
-  
+
   const [showForm, setShowForm] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -115,15 +117,15 @@ const ProjectsView = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('projects')}</h1>
           <p className="text-gray-600">
-            Manage and track project progress across your organization
+            Gestiona y rastrea el progreso de proyectos en tu organización
           </p>
         </div>
         {canCreateProjects && (
           <Button onClick={() => setShowForm(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            New Project
+            {t('newProject')}
           </Button>
         )}
       </div>
@@ -133,7 +135,7 @@ const ProjectsView = () => {
         <CardHeader>
           <CardTitle className="text-lg flex items-center">
             <Filter className="h-5 w-5 mr-2" />
-            Filters
+            Filtros
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -141,23 +143,23 @@ const ProjectsView = () => {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                placeholder="Search projects..."
+                placeholder="Buscar proyectos..."
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
                 className="pl-10"
               />
             </div>
-            
+
             <select
               value={filters.status}
               onChange={(e) => handleFilterChange('status', e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="">All Status</option>
-              <option value="ACTIVE">Active</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="ON_HOLD">On Hold</option>
-              <option value="CANCELLED">Cancelled</option>
+              <option value="">Todos los Estados</option>
+              <option value="ACTIVE">{t('active')}</option>
+              <option value="COMPLETED">{t('completed')}</option>
+              <option value="ON_HOLD">{t('onHold')}</option>
+              <option value="CANCELLED">{t('cancelled')}</option>
             </select>
 
             <select
@@ -165,11 +167,11 @@ const ProjectsView = () => {
               onChange={(e) => handleFilterChange('priority', e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="">All Priorities</option>
-              <option value="LOW">Low</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="HIGH">High</option>
-              <option value="URGENT">Urgent</option>
+              <option value="">Todas las Prioridades</option>
+              <option value="LOW">{t('low')}</option>
+              <option value="MEDIUM">{t('medium')}</option>
+              <option value="HIGH">{t('high')}</option>
+              <option value="URGENT">{t('urgent')}</option>
             </select>
 
             <select
@@ -177,7 +179,7 @@ const ProjectsView = () => {
               onChange={(e) => handleFilterChange('areaId', e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="">All Areas</option>
+              <option value="">Todas las Áreas</option>
               {areas && areas.map((area) => (
                 <option key={area.id} value={area.id}>
                   {area.name}
@@ -198,7 +200,7 @@ const ProjectsView = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {projects.map((project) => {
           const progress = calculateProgress(project);
-          
+
           return (
             <Card key={project.id} className="hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
@@ -250,7 +252,7 @@ const ProjectsView = () => {
                   </div>
                 </div>
               </CardHeader>
-              
+
               <CardContent>
                 <p className="text-gray-600 text-sm mb-4 line-clamp-2">
                   {project.description}
@@ -308,12 +310,12 @@ const ProjectsView = () => {
                       <span className="text-gray-600">{project.area.name}</span>
                     </div>
                   )}
-                  
+
                   <div className="flex items-center justify-between">
                     <span className="text-gray-500">Start Date:</span>
                     <span>{formatDate(project.startDate)}</span>
                   </div>
-                  
+
                   <div className="flex items-center justify-between">
                     <span className="text-gray-500">End Date:</span>
                     <span>{formatDate(project.endDate)}</span>
@@ -419,8 +421,8 @@ const ProjectsView = () => {
           }
         >
           <p className="text-gray-600">
-            Are you sure you want to delete the project "{projectToDelete?.name}"? 
-            This action cannot be undone and will remove all associated tasks, 
+            Are you sure you want to delete the project "{projectToDelete?.name}"?
+            This action cannot be undone and will remove all associated tasks,
             time entries, and assignments.
           </p>
         </Modal>

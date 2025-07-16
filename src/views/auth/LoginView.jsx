@@ -4,13 +4,15 @@ import { useForm } from 'react-hook-form';
 import { Eye, EyeOff } from 'lucide-react';
 import { Button, Input, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const LoginView = () => {
   const [showPassword, setShowPassword] = useState(false);
   const { login } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const from = location.state?.from?.pathname || '/dashboard';
 
   const {
@@ -25,8 +27,8 @@ const LoginView = () => {
       await login(data);
       navigate(from, { replace: true });
     } catch (error) {
-      setError('root', { 
-        message: error.response?.data?.message || 'Invalid credentials' 
+      setError('root', {
+        message: error.response?.data?.message || t('invalidCredentials')
       });
     }
   };
@@ -36,44 +38,44 @@ const LoginView = () => {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to TeamTime
+            {t('signInToTeamTime')}
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Track your time, manage your projects
+            {t('trackYourTime')}
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Welcome back</CardTitle>
+            <CardTitle>{t('welcomeBack')}</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               <Input
-                label="Email address"
+                label={t('emailAddress')}
                 type="email"
                 required
                 error={errors.email?.message}
                 {...register('email', {
-                  required: 'Email is required',
+                  required: t('emailRequired'),
                   pattern: {
                     value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                    message: 'Invalid email address',
+                    message: t('invalidEmail'),
                   },
                 })}
               />
 
               <div className="relative">
                 <Input
-                  label="Password"
+                  label={t('password')}
                   type={showPassword ? 'text' : 'password'}
                   required
                   error={errors.password?.message}
                   {...register('password', {
-                    required: 'Password is required',
+                    required: t('passwordRequired'),
                     minLength: {
                       value: 6,
-                      message: 'Password must be at least 6 characters',
+                      message: t('passwordMinLength'),
                     },
                   })}
                 />
@@ -95,7 +97,7 @@ const LoginView = () => {
                   to="/forgot-password"
                   className="text-sm text-primary-600 hover:text-primary-500"
                 >
-                  Forgot your password?
+                  {t('forgotPassword')}
                 </Link>
               </div>
 
@@ -104,7 +106,7 @@ const LoginView = () => {
                 className="w-full"
                 loading={isSubmitting}
               >
-                Sign in
+                {t('signIn')}
               </Button>
             </form>
           </CardContent>
