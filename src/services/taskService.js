@@ -45,13 +45,19 @@ export const taskService = {
 
   // Assign task to user
   assignUser: async (id, userId) => {
-    const response = await api.post(`/tasks/${id}/assign`, { userId });
+    const response = await api.patch(`/tasks/${id}/assign`, { assignedTo: userId });
+    return response.data;
+  },
+
+  // Bulk assign tasks to user
+  bulkAssignTasks: async (taskIds, userId) => {
+    const response = await api.post(`/tasks/bulk-assign`, { taskIds, userId });
     return response.data;
   },
 
   // Unassign task from user
-  unassignUser: async (id, userId) => {
-    const response = await api.delete(`/tasks/${id}/assign/${userId}`);
+  unassignUser: async (id) => {
+    const response = await api.patch(`/tasks/${id}/assign`, { assignedTo: null });
     return response.data;
   },
 

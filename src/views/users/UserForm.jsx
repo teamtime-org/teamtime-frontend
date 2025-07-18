@@ -29,14 +29,12 @@ const UserForm = ({ isOpen, onClose, onSubmit, user = null, loading = false }) =
 
   useEffect(() => {
     if (isOpen && user) {
-      console.log('Cargando datos del usuario:', user);
-      console.log('AreaId del usuario:', user.areaId);
       setFormData({
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         email: user.email || '',
         role: user.role || ROLES.EMPLOYEE,
-        areaId: user.areaId || '',
+        areaId: user.areaId || user.area?.id || '',
         password: '',
         confirmPassword: ''
       });
@@ -54,28 +52,6 @@ const UserForm = ({ isOpen, onClose, onSubmit, user = null, loading = false }) =
     }
   }, [isOpen, user]);
 
-  // Debug effect para validar cuando áreas y usuario estén cargados
-  useEffect(() => {
-    if (areas.length > 0 && user && formData.areaId) {
-      console.log('=== VALIDACIÓN DE ÁREA ===');
-      console.log('formData.areaId:', formData.areaId);
-      console.log('Tipo de formData.areaId:', typeof formData.areaId);
-      console.log('Áreas disponibles:');
-      areas.forEach(area => {
-        console.log(`  - ID: "${area.id}" (tipo: ${typeof area.id}) | Nombre: "${area.name}"`);
-        console.log(`  - ¿Coincide? ${area.id === formData.areaId}`);
-      });
-      
-      const matchingArea = areas.find(area => area.id === formData.areaId);
-      console.log('Área que debería estar seleccionada:', matchingArea);
-      console.log('=========================');
-    }
-  }, [areas, formData.areaId, user]);
-
-  // Monitor de cambios en formData
-  useEffect(() => {
-    console.log('🔄 formData cambió:', formData);
-  }, [formData]);
 
   const fetchAreas = async () => {
     setLoadingAreas(true);
@@ -83,7 +59,6 @@ const UserForm = ({ isOpen, onClose, onSubmit, user = null, loading = false }) =
       const response = await areaService.getAll();
       const areasData = response.data?.areas || response.data || [];
       const finalAreas = Array.isArray(areasData) ? areasData : [];
-      console.log('Áreas cargadas:', finalAreas);
       setAreas(finalAreas);
     } catch (error) {
       console.error('Error al cargar áreas:', error);
@@ -261,21 +236,15 @@ const UserForm = ({ isOpen, onClose, onSubmit, user = null, loading = false }) =
               disabled={loadingAreas}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {console.log('Renderizando select con formData.areaId:', formData.areaId)}
-              {console.log('Áreas disponibles en render:', areas.map(a => ({ id: a.id, name: a.name })))}
               <option value="">
                 {formData.role === ROLES.ADMIN ? 'Sin área asignada' : 'Seleccionar área'}
               </option>
               {Array.isArray(areas) && areas.length > 0 ? (
-                areas.map((area) => {
-                  const isSelected = area.id === formData.areaId;
-                  console.log(`Opción ${area.name}: value="${area.id}", selected=${isSelected}`);
-                  return (
-                    <option key={area.id} value={area.id} selected={isSelected}>
-                      {area.name}
-                    </option>
-                  );
-                })
+                areas.map((area) => (
+                  <option key={area.id} value={area.id}>
+                    {area.name}
+                  </option>
+                ))
               ) : (
                 !loadingAreas && (
                   <option value="" disabled>

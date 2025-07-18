@@ -1,42 +1,29 @@
 import { Fragment } from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  Home, 
-  FolderOpen, 
-  CheckSquare, 
-  Clock, 
-  Users, 
-  Building, 
-  BarChart3, 
-  X 
+import {
+  Home,
+  FolderOpen,
+  CheckSquare,
+  Clock,
+  Users,
+  Building,
+  BarChart3,
+  X
 } from 'lucide-react';
 import { cn } from '@/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/hooks/useTranslation';
+import { LanguageSelector } from '@/components/ui';
 import { ROLES } from '@/constants';
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Projects', href: '/projects', icon: FolderOpen },
-  { name: 'Tasks', href: '/tasks', icon: CheckSquare },
-  { name: 'Timesheet', href: '/timesheet', icon: Clock },
-  { name: 'Reports', href: '/reports', icon: BarChart3 },
-];
-
-const adminNavigation = [
-  { name: 'Users', href: '/users', icon: Users },
-  { name: 'Areas', href: '/areas', icon: Building },
-];
-
 const AppSidebar = ({ isOpen, onClose }) => {
-  const { user } = useAuth();
-  const isAdmin = user?.role === ROLES.ADMIN;
 
   return (
     <Fragment>
       {isOpen && (
         <div className="relative z-50 lg:hidden">
           <div className="fixed inset-0 bg-gray-900/80" onClick={onClose} />
-          
+
           <div className="fixed inset-0 flex">
             <div className="relative mr-16 flex w-full max-w-xs flex-1">
               <div className="absolute left-full top-0 flex w-16 justify-center pt-5">
@@ -44,7 +31,7 @@ const AppSidebar = ({ isOpen, onClose }) => {
                   <X className="h-6 w-6 text-white" />
                 </button>
               </div>
-              
+
               <SidebarContent />
             </div>
           </div>
@@ -60,7 +47,21 @@ const AppSidebar = ({ isOpen, onClose }) => {
 
 const SidebarContent = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const isAdmin = user?.role === ROLES.ADMIN;
+
+  const navigation = [
+    { name: t('dashboard'), href: '/dashboard', icon: Home },
+    { name: t('projects'), href: '/projects', icon: FolderOpen },
+    { name: t('tasks'), href: '/tasks', icon: CheckSquare },
+    { name: t('timesheet'), href: '/timesheet', icon: Clock },
+    { name: t('reports'), href: '/reports', icon: BarChart3 },
+  ];
+
+  const adminNavigation = [
+    { name: t('users'), href: '/users', icon: Users },
+    { name: t('areas'), href: '/areas', icon: Building },
+  ];
 
   return (
     <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-gray-900 px-6 pb-4">
@@ -72,7 +73,7 @@ const SidebarContent = () => {
         />
         <span className="ml-2 text-xl font-bold text-white">TeamTime</span>
       </div>
-      
+
       <nav className="flex flex-1 flex-col">
         <ul role="list" className="flex flex-1 flex-col gap-y-7">
           <li>
@@ -97,11 +98,11 @@ const SidebarContent = () => {
               ))}
             </ul>
           </li>
-          
+
           {isAdmin && (
             <li>
               <div className="text-xs font-semibold leading-6 text-gray-400">
-                Administration
+                {t('administration')}
               </div>
               <ul role="list" className="-mx-2 mt-2 space-y-1">
                 {adminNavigation.map((item) => (
@@ -127,6 +128,11 @@ const SidebarContent = () => {
           )}
         </ul>
       </nav>
+
+      {/* Language Selector */}
+      <div className="mt-auto pb-4">
+        <LanguageSelector />
+      </div>
     </div>
   );
 };

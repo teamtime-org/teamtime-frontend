@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Calendar, 
-  Users, 
-  Clock, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Calendar,
+  Users,
+  Clock,
   MoreVertical,
   Edit,
   Trash2,
@@ -18,14 +18,16 @@ import {
   AlertCircle,
   Timer,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  UserPlus,
+  X
 } from 'lucide-react';
-import { 
-  Button, 
-  Input, 
-  Card, 
-  CardContent, 
-  CardHeader, 
+import {
+  Button,
+  Input,
+  Card,
+  CardContent,
+  CardHeader,
   CardTitle,
   Modal,
   Badge,
@@ -40,48 +42,51 @@ import {
 import { useTasks } from '@/hooks/useTasks';
 import { useProjects } from '@/hooks/useProjects';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/hooks/useTranslation';
 import { ROLES, TASK_STATUS, TASK_PRIORITY } from '@/constants';
 import { formatDate, formatDuration } from '@/utils';
 import TaskForm from './TaskForm';
-
-const statusConfig = {
-  [TASK_STATUS.TODO]: { 
-    variant: 'secondary', 
-    label: 'To Do', 
-    icon: Circle,
-    color: 'text-gray-500' 
-  },
-  [TASK_STATUS.IN_PROGRESS]: { 
-    variant: 'primary', 
-    label: 'In Progress', 
-    icon: Play,
-    color: 'text-blue-500' 
-  },
-  [TASK_STATUS.REVIEW]: { 
-    variant: 'warning', 
-    label: 'Review', 
-    icon: AlertCircle,
-    color: 'text-yellow-500' 
-  },
-  [TASK_STATUS.DONE]: { 
-    variant: 'success', 
-    label: 'Done', 
-    icon: CheckCircle,
-    color: 'text-green-500' 
-  },
-};
-
-const priorityConfig = {
-  [TASK_PRIORITY.LOW]: { variant: 'secondary', label: 'Low', color: 'bg-gray-100' },
-  [TASK_PRIORITY.MEDIUM]: { variant: 'primary', label: 'Medium', color: 'bg-blue-100' },
-  [TASK_PRIORITY.HIGH]: { variant: 'warning', label: 'High', color: 'bg-yellow-100' },
-  [TASK_PRIORITY.URGENT]: { variant: 'danger', label: 'Urgent', color: 'bg-red-100' },
-};
+import BulkAssignModal from './BulkAssignModal';
 
 const TasksView = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const { projects } = useProjects();
+
+  const statusConfig = {
+    [TASK_STATUS.TODO]: {
+      variant: 'secondary',
+      label: 'Pendiente',
+      icon: Circle,
+      color: 'text-gray-500'
+    },
+    [TASK_STATUS.IN_PROGRESS]: {
+      variant: 'primary',
+      label: t('inProgress'),
+      icon: Play,
+      color: 'text-blue-500'
+    },
+    [TASK_STATUS.REVIEW]: {
+      variant: 'warning',
+      label: t('review'),
+      icon: AlertCircle,
+      color: 'text-yellow-500'
+    },
+    [TASK_STATUS.DONE]: {
+      variant: 'success',
+      label: t('done'),
+      icon: CheckCircle,
+      color: 'text-green-500'
+    },
+  };
+
+  const priorityConfig = {
+    [TASK_PRIORITY.LOW]: { variant: 'secondary', label: t('low'), color: 'bg-gray-100' },
+    [TASK_PRIORITY.MEDIUM]: { variant: 'primary', label: t('medium'), color: 'bg-blue-100' },
+    [TASK_PRIORITY.HIGH]: { variant: 'warning', label: t('high'), color: 'bg-yellow-100' },
+    [TASK_PRIORITY.URGENT]: { variant: 'danger', label: t('urgent'), color: 'bg-red-100' },
+  };
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -90,15 +95,22 @@ const TasksView = () => {
     assignedTo: '',
     dueDate: '',
   });
-  
-  const { tasks, loading, error, pagination, fetchTasks, deleteTask, updateTaskStatus } = useTasks(filters);
-  
+
+  const { tasks, loading, error, pagination, fetchTasks, deleteTask, updateTaskStatus } = useTasks();
+
+  // Fetch tasks when filters change
+  useEffect(() => {
+    fetchTasks(filters);
+  }, [filters, fetchTasks]);
+
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState(null);
   const [viewMode, setViewMode] = useState('list'); // grid | list | kanban
   const [expandedProjects, setExpandedProjects] = useState(new Set());
+  const [selectedTasks, setSelectedTasks] = useState(new Set());
+  const [showBulkAssign, setShowBulkAssign] = useState(false);
 
   const isAdmin = user?.role === ROLES.ADMIN;
   const isManager = user?.role === ROLES.MANAGER;
@@ -106,8 +118,9 @@ const TasksView = () => {
 
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value };
+    console.log('Aplicando filtros:', newFilters);
     setFilters(newFilters);
-    fetchTasks(newFilters);
+    // fetchTasks se llamará automáticamente por el useEffect
   };
 
   const handleEdit = (task) => {
@@ -150,6 +163,41 @@ const TasksView = () => {
     }
   };
 
+  // Funciones para selección múltiple
+  const handleTaskSelect = (taskId) => {
+    console.log('Selecting task:', taskId);
+    const newSelected = new Set(selectedTasks);
+    if (newSelected.has(taskId)) {
+      newSelected.delete(taskId);
+    } else {
+      newSelected.add(taskId);
+    }
+    console.log('New selection:', newSelected);
+    setSelectedTasks(newSelected);
+  };
+
+  // const handleSelectAll = () => {
+  //   if (selectedTasks.size === tasks?.length) {
+  //     setSelectedTasks(new Set());
+  //   } else {
+  //     setSelectedTasks(new Set(tasks?.map(task => task.id) || []));
+  //   }
+  // };
+
+  const handleClearSelection = () => {
+    setSelectedTasks(new Set());
+  };
+
+  const handleBulkAssign = () => {
+    setShowBulkAssign(true);
+  };
+
+  const handleBulkAssignSuccess = async () => {
+    setSelectedTasks(new Set());
+    setShowBulkAssign(false);
+    await fetchTasks(filters);
+  };
+
   const calculateProgress = (task) => {
     if (!task.estimatedHours || task.estimatedHours === 0) return 0;
     const loggedHours = task.loggedHours || 0;
@@ -170,14 +218,14 @@ const TasksView = () => {
   const groupTasksByProject = (tasks) => {
     const grouped = tasks.reduce((acc, task) => {
       const projectKey = task.project?.id || 'no-project';
-      
+
       if (!acc[projectKey]) {
         acc[projectKey] = {
           project: task.project || { name: 'No Project', id: 'no-project' },
           tasks: []
         };
       }
-      
+
       acc[projectKey].tasks.push(task);
       return acc;
     }, {});
@@ -211,9 +259,9 @@ const TasksView = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tasks</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('tasks')}</h1>
           <p className="text-gray-600">
-            Manage and track task progress across your projects
+            {t('manageTaskProgress')}
           </p>
         </div>
         <div className="flex items-center space-x-3">
@@ -221,40 +269,37 @@ const TasksView = () => {
           <div className="flex items-center bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => setViewMode('grid')}
-              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'grid' 
-                  ? 'bg-white text-gray-900 shadow-sm' 
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === 'grid'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
             >
-              Grid
+              {t('grid')}
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'list' 
-                  ? 'bg-white text-gray-900 shadow-sm' 
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === 'list'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
             >
-              List
+              {t('list')}
             </button>
             <button
               onClick={() => setViewMode('kanban')}
-              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'kanban' 
-                  ? 'bg-white text-gray-900 shadow-sm' 
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === 'kanban'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
             >
-              Kanban
+              {t('kanban')}
             </button>
           </div>
 
           {canCreateTasks && (
             <Button onClick={() => setShowForm(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              New Task
+              {t('newTask')}
             </Button>
           )}
         </div>
@@ -265,7 +310,7 @@ const TasksView = () => {
         <CardHeader>
           <CardTitle className="text-lg flex items-center">
             <Filter className="h-5 w-5 mr-2" />
-            Filters
+            {t('filters')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -273,23 +318,23 @@ const TasksView = () => {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                placeholder="Search tasks..."
+                placeholder={t('searchTasks')}
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
                 className="pl-10"
               />
             </div>
-            
+
             <select
               value={filters.status}
               onChange={(e) => handleFilterChange('status', e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="">All Status</option>
-              <option value={TASK_STATUS.TODO}>To Do</option>
-              <option value={TASK_STATUS.IN_PROGRESS}>In Progress</option>
-              <option value={TASK_STATUS.REVIEW}>Review</option>
-              <option value={TASK_STATUS.DONE}>Done</option>
+              <option value="">{t('allStatus')}</option>
+              <option value={TASK_STATUS.TODO}>{t('todo')}</option>
+              <option value={TASK_STATUS.IN_PROGRESS}>{t('inProgress')}</option>
+              <option value={TASK_STATUS.REVIEW}>{t('inReview')}</option>
+              <option value={TASK_STATUS.DONE}>{t('done')}</option>
             </select>
 
             <select
@@ -297,11 +342,11 @@ const TasksView = () => {
               onChange={(e) => handleFilterChange('priority', e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="">All Priorities</option>
-              <option value={TASK_PRIORITY.LOW}>Low</option>
-              <option value={TASK_PRIORITY.MEDIUM}>Medium</option>
-              <option value={TASK_PRIORITY.HIGH}>High</option>
-              <option value={TASK_PRIORITY.URGENT}>Urgent</option>
+              <option value="">{t('allPriorities')}</option>
+              <option value={TASK_PRIORITY.LOW}>{t('low')}</option>
+              <option value={TASK_PRIORITY.MEDIUM}>{t('medium')}</option>
+              <option value={TASK_PRIORITY.HIGH}>{t('high')}</option>
+              <option value={TASK_PRIORITY.URGENT}>{t('urgent')}</option>
             </select>
 
             <select
@@ -309,7 +354,7 @@ const TasksView = () => {
               onChange={(e) => handleFilterChange('projectId', e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="">All Projects</option>
+              <option value="">{t('allProjects')}</option>
               {projects && projects.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}
@@ -322,9 +367,9 @@ const TasksView = () => {
               onChange={(e) => handleFilterChange('assignedTo', e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="">All Assignees</option>
-              <option value="me">My Tasks</option>
-              <option value="unassigned">Unassigned</option>
+              <option value="">{t('allAssignees')}</option>
+              <option value="me">{t('myTasks')}</option>
+              <option value="unassigned">{t('unassigned')}</option>
             </select>
 
             <Input
@@ -337,6 +382,42 @@ const TasksView = () => {
         </CardContent>
       </Card>
 
+      {/* Toolbar de selección múltiple */}
+      {console.log('Selected tasks count:', selectedTasks.size, 'Selected:', selectedTasks)}
+      {selectedTasks.size > 0 && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-medium text-blue-900">
+                  {selectedTasks.size} tarea{selectedTasks.size !== 1 ? 's' : ''} seleccionada{selectedTasks.size !== 1 ? 's' : ''}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearSelection}
+                  className="h-8"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Limpiar
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleBulkAssign}
+                  size="sm"
+                  className="h-8"
+                  disabled={selectedTasks.size === 0}
+                >
+                  <UserPlus className="h-4 w-4 mr-1" />
+                  Asignar a Usuario
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {error && !error.includes('Backend not available') && (
         <div className="bg-red-50 border border-red-200 rounded-md p-4">
           <p className="text-red-600">{error}</p>
@@ -346,7 +427,7 @@ const TasksView = () => {
       {error && error.includes('Backend not available') && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
           <p className="text-yellow-800">
-            <strong>Backend not available:</strong> Some task features are disabled. 
+            <strong>Backend not available:</strong> Some task features are disabled.
             The backend server needs to implement the tasks API endpoints.
           </p>
         </div>
@@ -355,39 +436,46 @@ const TasksView = () => {
       {/* Tasks Grid */}
       {viewMode === 'grid' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {console.log('Tasks loaded:', tasks, 'Count:', tasks?.length)}
           {tasks.map((task) => {
             const progress = calculateProgress(task);
             const overdue = isOverdue(task);
-            
+
             return (
-              <Card 
-                key={task.id} 
-                className={`hover:shadow-lg transition-shadow ${
-                  overdue ? 'ring-2 ring-red-200' : ''
-                }`}
+              <Card
+                key={task.id}
+                className={`hover:shadow-lg transition-shadow ${overdue ? 'ring-2 ring-red-200' : ''} ${selectedTasks.has(task.id) ? 'ring-2 ring-blue-300' : ''}`}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 mb-1">
-                        {getStatusIcon(task.status)}
-                        <CardTitle className="text-sm truncate">{task.title}</CardTitle>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge 
-                          variant={priorityConfig[task.priority]?.variant}
-                          className={`${priorityConfig[task.priority]?.color} text-xs`}
-                        >
-                          {priorityConfig[task.priority]?.label}
-                        </Badge>
-                        <Badge variant={statusConfig[task.status]?.variant} className="text-xs">
-                          {statusConfig[task.status]?.label}
-                        </Badge>
-                        {overdue && (
-                          <Badge variant="danger" className="text-xs">
-                            Overdue
+                    <div className="flex items-start gap-2 flex-1 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={selectedTasks.has(task.id)}
+                        onChange={() => handleTaskSelect(task.id)}
+                        className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-1">
+                          {getStatusIcon(task.status)}
+                          <CardTitle className="text-sm truncate">{task.title}</CardTitle>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge
+                            variant={priorityConfig[task.priority]?.variant}
+                            className={`${priorityConfig[task.priority]?.color} text-xs`}
+                          >
+                            {priorityConfig[task.priority]?.label}
                           </Badge>
-                        )}
+                          <Badge variant={statusConfig[task.status]?.variant} className="text-xs">
+                            {statusConfig[task.status]?.label}
+                          </Badge>
+                          {overdue && (
+                            <Badge variant="danger" className="text-xs">
+                              Overdue
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="relative ml-2">
@@ -426,7 +514,7 @@ const TasksView = () => {
                     </div>
                   </div>
                 </CardHeader>
-                
+
                 <CardContent>
                   <p className="text-gray-600 text-xs mb-3 line-clamp-2">
                     {task.description}
@@ -441,9 +529,8 @@ const TasksView = () => {
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-1.5">
                         <div
-                          className={`h-1.5 rounded-full transition-all ${
-                            progress === 100 ? 'bg-green-500' : 'bg-blue-500'
-                          }`}
+                          className={`h-1.5 rounded-full transition-all ${progress === 100 ? 'bg-green-500' : 'bg-blue-500'
+                            }`}
                           style={{ width: `${progress}%` }}
                         />
                       </div>
@@ -461,14 +548,19 @@ const TasksView = () => {
                         <span className="text-gray-600 truncate">{task.project.name}</span>
                       </div>
                     )}
-                    
-                    {task.assignedTo && (
+
+                    {task.assignee && (
                       <div className="flex items-center">
                         <Users className="h-3 w-3 mr-2 text-gray-400" />
-                        <span className="text-gray-600">{task.assignedTo.name}</span>
+                        <span className="text-gray-600">
+                          {task.assignee.firstName && task.assignee.lastName
+                            ? `${task.assignee.firstName} ${task.assignee.lastName}`
+                            : task.assignee.name || task.assignee.email || t('unknown')
+                          }
+                        </span>
                       </div>
                     )}
-                    
+
                     {task.dueDate && (
                       <div className="flex items-center">
                         <Calendar className="h-3 w-3 mr-2 text-gray-400" />
@@ -477,7 +569,7 @@ const TasksView = () => {
                         </span>
                       </div>
                     )}
-                    
+
                     {task.estimatedHours && (
                       <div className="flex items-center">
                         <Clock className="h-3 w-3 mr-2 text-gray-400" />
@@ -510,7 +602,7 @@ const TasksView = () => {
                         </button>
                       )}
                     </div>
-                    
+
                     <button
                       onClick={() => navigate(`/tasks/${task.id}/timer`)}
                       className="p-1 rounded hover:bg-gray-100 text-gray-600"
@@ -592,11 +684,11 @@ const TasksView = () => {
             const isExpanded = expandedProjects.has(group.project.id);
             const completedTasks = group.tasks.filter(t => t.status === TASK_STATUS.DONE).length;
             const overdueTasks = group.tasks.filter(t => isOverdue(t)).length;
-            
+
             return (
               <Card key={group.project.id}>
                 <CardHeader className="pb-3">
-                  <CardTitle 
+                  <CardTitle
                     className="flex items-center text-lg cursor-pointer hover:bg-gray-50 -m-4 p-4 rounded-lg"
                     onClick={() => toggleProjectExpansion(group.project.id)}
                   >
@@ -629,145 +721,192 @@ const TasksView = () => {
                 </CardHeader>
                 {isExpanded && (
                   <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-8"></TableHead>
-                      <TableHead>Task</TableHead>
-                      <TableHead className="w-24">Priority</TableHead>
-                      <TableHead className="w-24">Status</TableHead>
-                      <TableHead className="w-32">Assignee</TableHead>
-                      <TableHead className="w-24">Due Date</TableHead>
-                      <TableHead className="w-20">Progress</TableHead>
-                      <TableHead className="w-20">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {group.tasks.map((task) => {
-                      const progress = calculateProgress(task);
-                      const overdue = isOverdue(task);
-                      
-                      return (
-                        <TableRow key={task.id} className={overdue ? 'bg-red-50' : ''}>
-                          <TableCell>
-                            {getStatusIcon(task.status)}
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium text-sm">{task.title}</div>
-                              {task.description && (
-                                <div className="text-xs text-gray-500 truncate max-w-xs">
-                                  {task.description}
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant={priorityConfig[task.priority]?.variant}
-                              className="text-xs"
-                            >
-                              {priorityConfig[task.priority]?.label}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={statusConfig[task.status]?.variant} className="text-xs">
-                              {statusConfig[task.status]?.label}
-                            </Badge>
-                            {overdue && (
-                              <Badge variant="danger" className="text-xs ml-1">
-                                Overdue
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center">
-                              {task.assignedTo ? (
-                                <>
-                                  <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center mr-2">
-                                    <span className="text-xs font-medium">
-                                      {task.assignedTo.firstName?.charAt(0) || task.assignedTo.name?.charAt(0) || '?'}
-                                    </span>
-                                  </div>
-                                  <span className="text-xs text-gray-600 truncate">
-                                    {task.assignedTo.firstName && task.assignedTo.lastName 
-                                      ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}`
-                                      : task.assignedTo.name || 'Unknown'
-                                    }
-                                  </span>
-                                </>
-                              ) : (
-                                <span className="text-xs text-gray-400">Unassigned</span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {task.dueDate ? (
-                              <span className={`text-xs ${overdue ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
-                                {formatDate(task.dueDate)}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-gray-400">No due date</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {task.estimatedHours > 0 ? (
-                              <div className="flex items-center space-x-2">
-                                <div className="w-12 bg-gray-200 rounded-full h-1.5">
-                                  <div
-                                    className={`h-1.5 rounded-full transition-all ${
-                                      progress === 100 ? 'bg-green-500' : 'bg-blue-500'
-                                    }`}
-                                    style={{ width: `${progress}%` }}
-                                  />
-                                </div>
-                                <span className="text-xs text-gray-600 w-8">{progress}%</span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-gray-400">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-1">
-                              <button
-                                onClick={() => navigate(`/tasks/${task.id}`)}
-                                className="p-1 rounded hover:bg-gray-100 text-gray-600"
-                                title="View Details"
-                              >
-                                <Eye className="h-3 w-3" />
-                              </button>
-                              {canCreateTasks && (
-                                <>
-                                  <button
-                                    onClick={() => handleEdit(task)}
-                                    className="p-1 rounded hover:bg-gray-100 text-gray-600"
-                                    title="Edit"
-                                  >
-                                    <Edit className="h-3 w-3" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDelete(task)}
-                                    className="p-1 rounded hover:bg-red-100 text-red-600"
-                                    title="Delete"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </button>
-                                </>
-                              )}
-                              <button
-                                onClick={() => navigate(`/tasks/${task.id}/timer`)}
-                                className="p-1 rounded hover:bg-gray-100 text-gray-600"
-                                title="Time Tracker"
-                              >
-                                <Timer className="h-3 w-3" />
-                              </button>
-                            </div>
-                          </TableCell>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-8">
+                            <input
+                              type="checkbox"
+                              checked={group.tasks.length > 0 && group.tasks.every(task => selectedTasks.has(task.id))}
+                              onChange={() => {
+                                const allSelected = group.tasks.every(task => selectedTasks.has(task.id));
+                                const newSelected = new Set(selectedTasks);
+                                group.tasks.forEach(task => {
+                                  if (allSelected) {
+                                    newSelected.delete(task.id);
+                                  } else {
+                                    newSelected.add(task.id);
+                                  }
+                                });
+                                setSelectedTasks(newSelected);
+                              }}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </TableHead>
+                          <TableHead className="w-8"></TableHead>
+                          <TableHead>Task</TableHead>
+                          <TableHead className="w-24">Priority</TableHead>
+                          <TableHead className="w-24">Status</TableHead>
+                          <TableHead className="w-32">Assignee</TableHead>
+                          <TableHead className="w-24">Due Date</TableHead>
+                          <TableHead className="w-20">Progress</TableHead>
+                          <TableHead className="w-20">Actions</TableHead>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {group.tasks.map((task) => {
+                          const progress = calculateProgress(task);
+                          const overdue = isOverdue(task);
+
+                          return (
+                            <TableRow key={task.id} className={`${overdue ? 'bg-red-50' : ''} ${selectedTasks.has(task.id) ? 'bg-blue-50' : ''}`}>
+                              <TableCell>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedTasks.has(task.id)}
+                                  onChange={() => handleTaskSelect(task.id)}
+                                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                {getStatusIcon(task.status)}
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium text-sm">{task.title}</div>
+                                  {task.description && (
+                                    <div className="text-xs text-gray-500 truncate max-w-xs">
+                                      {task.description}
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={priorityConfig[task.priority]?.variant}
+                                  className="text-xs"
+                                >
+                                  {priorityConfig[task.priority]?.label}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={statusConfig[task.status]?.variant} className="text-xs">
+                                  {statusConfig[task.status]?.label}
+                                </Badge>
+                                {overdue && (
+                                  <Badge variant="danger" className="text-xs ml-1">
+                                    Overdue
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center">
+                                  {task.assignee ? (
+                                    <>
+                                      <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center mr-2">
+                                        <span className="text-xs font-medium">
+                                          {(() => {
+                                            // Obtener las iniciales del nombre
+                                            if (task.assignee.firstName) {
+                                              return task.assignee.firstName.charAt(0).toUpperCase();
+                                            }
+                                            if (task.assignee.name) {
+                                              return task.assignee.name.charAt(0).toUpperCase();
+                                            }
+                                            if (task.assignee.email) {
+                                              return task.assignee.email.charAt(0).toUpperCase();
+                                            }
+                                            return '?';
+                                          })()}
+                                        </span>
+                                      </div>
+                                      <span className="text-xs text-gray-600 truncate">
+                                        {(() => {
+                                          // Mostrar el nombre completo
+                                          if (task.assignee.firstName && task.assignee.lastName) {
+                                            return `${task.assignee.firstName} ${task.assignee.lastName}`;
+                                          }
+                                          if (task.assignee.name) {
+                                            return task.assignee.name;
+                                          }
+                                          if (task.assignee.email) {
+                                            return task.assignee.email;
+                                          }
+                                          return t('unknown');
+                                        })()}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="text-xs text-gray-400">{t('unassigned')}</span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {task.dueDate ? (
+                                  <span className={`text-xs ${overdue ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
+                                    {formatDate(task.dueDate)}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-gray-400">No due date</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {task.estimatedHours > 0 ? (
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                                      <div
+                                        className={`h-1.5 rounded-full transition-all ${progress === 100 ? 'bg-green-500' : 'bg-blue-500'
+                                          }`}
+                                        style={{ width: `${progress}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-xs text-gray-600 w-8">{progress}%</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-gray-400">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center space-x-1">
+                                  <button
+                                    onClick={() => navigate(`/tasks/${task.id}`)}
+                                    className="p-1 rounded hover:bg-gray-100 text-gray-600"
+                                    title="View Details"
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                  </button>
+                                  {canCreateTasks && (
+                                    <>
+                                      <button
+                                        onClick={() => handleEdit(task)}
+                                        className="p-1 rounded hover:bg-gray-100 text-gray-600"
+                                        title="Edit"
+                                      >
+                                        <Edit className="h-3 w-3" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDelete(task)}
+                                        className="p-1 rounded hover:bg-red-100 text-red-600"
+                                        title="Delete"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    </>
+                                  )}
+                                  <button
+                                    onClick={() => navigate(`/tasks/${task.id}/timer`)}
+                                    className="p-1 rounded hover:bg-gray-100 text-gray-600"
+                                    title="Time Tracker"
+                                  >
+                                    <Timer className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
                   </CardContent>
                 )}
               </Card>
@@ -783,7 +922,7 @@ const TasksView = () => {
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
           <p className="text-gray-600 mb-4">
-            {Object.values(filters).some(f => f) 
+            {Object.values(filters).some(f => f)
               ? 'No tasks match your current filters.'
               : 'Get started by creating your first task.'
             }
@@ -870,12 +1009,20 @@ const TasksView = () => {
           }
         >
           <p className="text-gray-600">
-            Are you sure you want to delete the task "{taskToDelete?.title}"? 
-            This action cannot be undone and will remove all associated time entries 
+            Are you sure you want to delete the task "{taskToDelete?.title}"?
+            This action cannot be undone and will remove all associated time entries
             and comments.
           </p>
         </Modal>
       )}
+
+      {/* Bulk Assign Modal */}
+      <BulkAssignModal
+        isOpen={showBulkAssign}
+        onClose={() => setShowBulkAssign(false)}
+        selectedTaskIds={selectedTasks}
+        onSuccess={handleBulkAssignSuccess}
+      />
     </div>
   );
 };

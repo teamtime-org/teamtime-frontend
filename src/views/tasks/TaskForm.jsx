@@ -3,16 +3,20 @@ import { useForm } from 'react-hook-form';
 import { Button, Input } from '@/components/ui';
 import { useTasks } from '@/hooks/useTasks';
 import { useProjects } from '@/hooks/useProjects';
+import useUsers from '../../hooks/useUsers';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/hooks/useTranslation';
 import { ROLES, TASK_STATUS, TASK_PRIORITY } from '@/constants';
 
 const TaskForm = ({ task, onSuccess, onCancel }) => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const { createTask, updateTask, loading } = useTasks();
   const { projects = [] } = useProjects();
+  const { users } = useUsers();
   const [selectedProject, setSelectedProject] = useState(task?.projectId || '');
   const [selectedAssignee, setSelectedAssignee] = useState(
-    task?.assignedTo?.id || task?.assignedToId || ''
+    task?.assignedTo?.id || task?.assignedToId || task?.assignee?.id || task?.assignedTo || ''
   );
 
   const {
@@ -21,7 +25,6 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
     formState: { errors },
     setValue,
     reset,
-    watch,
   } = useForm({
     defaultValues: {
       title: task?.title || '',
@@ -36,16 +39,16 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
     },
   });
 
-  const startDate = watch('startDate');
   const selectedProjectData = projects?.find(p => p.id === selectedProject);
 
   useEffect(() => {
     if (task) {
+      const assigneeId = task.assignedTo?.id || task.assignedToId || task.assignee?.id || task.assignedTo || '';
       reset({
         title: task.title,
         description: task.description,
         projectId: task.projectId,
-        assignedToId: task.assignedTo?.id || task.assignedToId || '',
+        assignedToId: assigneeId,
         status: task.status,
         priority: task.priority,
         dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
@@ -53,20 +56,46 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
         tags: task.tags ? task.tags.join(', ') : '',
       });
       setSelectedProject(task.projectId);
-      setSelectedAssignee(task.assignedTo?.id || task.assignedToId || '');
+      setSelectedAssignee(assigneeId);
+      console.log('TaskForm loaded with task:', task);
+      console.log('Assigned to ID:', assigneeId);
     }
-  }, [task, reset]);
+  }, [task]); // Solo depende de task, no de reset // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSubmit = async (data) => {
     try {
+      // Log de depuración para verificar los datos
+      console.log('User data:', user);
+      console.log('Form data:', data);
+      console.log('Selected project:', selectedProject);
+      console.log('Selected assignee:', selectedAssignee);
+
+      // Verificar que el usuario esté autenticado y tenga un ID
+      if (!user || !user.id) {
+        alert('Error: Usuario no autenticado. Por favor inicia sesión de nuevo.');
+        return;
+      }
+
+      // Verificar que se haya seleccionado un proyecto
+      if (!selectedProject) {
+        alert('Error: Debe seleccionar un proyecto para crear la tarea.');
+        return;
+      }
+
       const taskData = {
         ...data,
         projectId: selectedProject,
         assignedTo: selectedAssignee || null,
+        createdBy: user.id, // Asegurar que se incluya el ID del usuario que crea la tarea
         estimatedHours: parseInt(data.estimatedHours) || 0,
         dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : null,
         tags: data.tags ? data.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
       };
+
+      // Remover assignedToId si existe en data para evitar conflictos
+      delete taskData.assignedToId;
+
+      console.log('Task data to send:', taskData);
 
       if (task) {
         await updateTask(task.id, taskData);
@@ -77,15 +106,16 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
       onSuccess();
     } catch (error) {
       console.error('Error saving task:', error);
-      
+      console.error('Error details:', error.response?.data);
+
       // Show better error messages
       if (error.response?.data?.message) {
         alert(`Error: ${error.response.data.message}`);
       } else if (error.response?.data?.errors) {
         const errorMessages = error.response.data.errors.map(err => err.message).join('\n');
-        alert(`Validation errors:\n${errorMessages}`);
+        alert(`Errores de validación:\n${errorMessages}`);
       } else {
-        alert('Error saving task. Please check all fields and try again.');
+        alert('Error al guardar la tarea. Por favor verifica todos los campos e intenta de nuevo.');
       }
     }
   };
@@ -104,33 +134,33 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
   };
 
   const isAdmin = user?.role === ROLES.ADMIN;
-  const isManager = user?.role === ROLES.MANAGER;
 
   // Managers can only create tasks in their projects
-  const availableProjects = isAdmin 
-    ? projects 
+  const availableProjects = isAdmin
+    ? projects
     : projects?.filter(project => project.areaId === user?.areaId);
 
-  // Get available assignees based on selected project
-  const availableAssignees = selectedProjectData?.assignments || [];
+  // Get available assignees - por ahora usamos todos los usuarios
+  // TODO: Filtrar usuarios basado en las asignaciones del proyecto
+  const availableAssignees = users || [];
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="md:col-span-2">
           <Input
-            label="Task Title"
+            label={t('taskTitle')}
             required
             error={errors.title?.message}
             {...register('title', {
-              required: 'Task title is required',
+              required: t('taskTitleRequired'),
               minLength: {
                 value: 3,
-                message: 'Task title must be at least 3 characters',
+                message: t('taskTitleMinLength'),
               },
               maxLength: {
                 value: 200,
-                message: 'Task title must not exceed 200 characters',
+                message: t('taskTitleMaxLength'),
               },
             })}
           />
@@ -138,15 +168,15 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
 
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Description
+            {t('description')}
           </label>
           <textarea
             className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            placeholder="Enter task description..."
+            placeholder={t('enterTaskDescription')}
             {...register('description', {
               maxLength: {
                 value: 1000,
-                message: 'Description must not exceed 1000 characters',
+                message: t('descriptionMaxLength'),
               },
             })}
           />
@@ -157,7 +187,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Project <span className="text-red-500">*</span>
+            {t('project')} <span className="text-red-500">*</span>
           </label>
           <select
             value={selectedProject}
@@ -165,7 +195,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             required
           >
-            <option value="">Select a project</option>
+            <option value="">{t('selectProject')}</option>
             {availableProjects && availableProjects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.name}
@@ -173,24 +203,19 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
             ))}
           </select>
           {!selectedProject && (
-            <p className="text-sm text-red-600 mt-1">Project is required</p>
+            <p className="text-sm text-red-600 mt-1">{t('projectRequired')}</p>
           )}
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Assigned To
+            {t('assignedTo')}
           </label>
-          <div className={`border border-input rounded-md bg-background ${
-            !selectedProject ? 'opacity-50 cursor-not-allowed' : ''
-          }`}>
-            {!selectedProject ? (
+          <div className={`border border-input rounded-md bg-background ${availableAssignees.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+            }`}>
+            {availableAssignees.length === 0 ? (
               <div className="p-3 text-sm text-gray-500">
-                Select a project first to see available assignees
-              </div>
-            ) : availableAssignees.length === 0 ? (
-              <div className="p-3 text-sm text-gray-500">
-                No assignees available for this project
+                {t('noUsersAvailable')}
               </div>
             ) : (
               <div className="max-h-[200px] overflow-y-auto">
@@ -204,30 +229,28 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
                       onChange={() => handleAssigneeChange('')}
                       className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                     />
-                    <span className="text-sm text-gray-600">Unassigned</span>
+                    <span className="text-sm text-gray-600">{t('unassigned')}</span>
                   </label>
-                  {availableAssignees.map((assignment) => {
-                    // Handle different data structures
-                    const user = assignment.user || assignment;
-                    const userId = user.id || assignment.userId || assignment.id;
-                    const userName = user.firstName && user.lastName 
+                  {availableAssignees.map((user) => {
+                    // Trabajamos directamente con usuarios
+                    const userId = user.id;
+                    const userName = user.firstName && user.lastName
                       ? `${user.firstName} ${user.lastName}`
-                      : user.name || user.fullName || `User ${userId}`;
+                      : user.name || `User ${userId}`;
                     const userEmail = user.email || '';
                     const userInitial = user.firstName?.charAt(0) || user.name?.charAt(0) || userName?.charAt(0) || '?';
-                    
+
                     if (!userId) {
-                      console.warn('Assignment without valid user ID:', assignment);
+                      console.warn('User without valid ID:', user);
                       return null;
                     }
-                    
+
                     const isSelected = selectedAssignee === userId;
                     return (
                       <label
                         key={userId}
-                        className={`flex items-center p-2 rounded cursor-pointer hover:bg-gray-50 ${
-                          isSelected ? 'bg-blue-50 border border-blue-200' : ''
-                        }`}
+                        className={`flex items-center p-2 rounded cursor-pointer hover:bg-gray-50 ${isSelected ? 'bg-blue-50 border border-blue-200' : ''
+                          }`}
                       >
                         <input
                           type="radio"
@@ -264,77 +287,72 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
           {selectedAssignee && (
             <div className="mt-2">
               {(() => {
-                const assignment = availableAssignees.find(a => {
-                  const user = a.user || a;
-                  const userId = user.id || a.userId || a.id;
-                  return userId === selectedAssignee;
-                });
-                if (!assignment) return null;
-                
-                const user = assignment.user || assignment;
-                const userName = user.firstName && user.lastName 
+                const user = availableAssignees.find(u => u.id === selectedAssignee);
+                if (!user) return null;
+
+                const userName = user.firstName && user.lastName
                   ? `${user.firstName} ${user.lastName}`
-                  : user.name || user.fullName || `User ${selectedAssignee}`;
-                
+                  : user.name || `User ${selectedAssignee}`;
+
                 return (
                   <div className="flex items-center text-sm text-gray-600">
-                    <span className="font-medium">Selected:</span>
+                    <span className="font-medium">{t('selectedAssignee')}:</span>
                     <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800">
                       {userName}
                     </span>
                   </div>
                 );
-              })()} 
+              })()}
             </div>
           )}
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Status
+            {t('status')}
           </label>
           <select
             {...register('status')}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            <option value={TASK_STATUS.TODO}>To Do</option>
-            <option value={TASK_STATUS.IN_PROGRESS}>In Progress</option>
-            <option value={TASK_STATUS.REVIEW}>Review</option>
-            <option value={TASK_STATUS.DONE}>Done</option>
+            <option value={TASK_STATUS.TODO}>{t('todo')}</option>
+            <option value={TASK_STATUS.IN_PROGRESS}>{t('inProgress')}</option>
+            <option value={TASK_STATUS.REVIEW}>{t('inReview')}</option>
+            <option value={TASK_STATUS.DONE}>{t('done')}</option>
           </select>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Priority
+            {t('priority')}
           </label>
           <select
             {...register('priority')}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            <option value={TASK_PRIORITY.LOW}>Low</option>
-            <option value={TASK_PRIORITY.MEDIUM}>Medium</option>
-            <option value={TASK_PRIORITY.HIGH}>High</option>
-            <option value={TASK_PRIORITY.URGENT}>Urgent</option>
+            <option value={TASK_PRIORITY.LOW}>{t('low')}</option>
+            <option value={TASK_PRIORITY.MEDIUM}>{t('medium')}</option>
+            <option value={TASK_PRIORITY.HIGH}>{t('high')}</option>
+            <option value={TASK_PRIORITY.URGENT}>{t('urgent')}</option>
           </select>
         </div>
 
         <div>
           <Input
-            label="Estimated Hours"
+            label={t('estimatedHours')}
             type="number"
             min="0"
             step="0.5"
-            placeholder="Enter estimated hours"
+            placeholder={t('estimatedHours')}
             error={errors.estimatedHours?.message}
             {...register('estimatedHours', {
               min: {
                 value: 0,
-                message: 'Estimated hours must be 0 or greater',
+                message: t('estimatedHoursMin'),
               },
               max: {
                 value: 1000,
-                message: 'Estimated hours must not exceed 1,000',
+                message: t('estimatedHoursMax'),
               },
             })}
           />
@@ -342,7 +360,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
 
         <div>
           <Input
-            label="Due Date"
+            label={t('dueDate')}
             type="date"
             min={selectedProjectData ? new Date(Math.max(Date.now(), new Date(selectedProjectData.startDate))).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
             max={selectedProjectData ? new Date(selectedProjectData.endDate).toISOString().split('T')[0] : undefined}
@@ -355,17 +373,17 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
                   const projectEndDate = new Date(selectedProjectData.endDate);
                   const today = new Date();
                   today.setHours(0, 0, 0, 0);
-                  
+
                   if (dueDate < today) {
-                    return 'Due date cannot be in the past';
+                    return t('dueDatePast');
                   }
-                  
+
                   if (dueDate < projectStartDate) {
-                    return `Due date cannot be before project start (${new Date(projectStartDate).toLocaleDateString()})`;
+                    return `${t('dueDateBeforeProject')} (${new Date(projectStartDate).toLocaleDateString()})`;
                   }
-                  
+
                   if (dueDate > projectEndDate) {
-                    return `Due date cannot be after project end (${new Date(projectEndDate).toLocaleDateString()})`;
+                    return `${t('dueDateAfterProject')} (${new Date(projectEndDate).toLocaleDateString()})`;
                   }
                 }
                 return true;
@@ -374,20 +392,20 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
           />
           {selectedProjectData && (
             <p className="text-sm text-gray-500 mt-1">
-              Project period: {new Date(selectedProjectData.startDate).toLocaleDateString()} - {new Date(selectedProjectData.endDate).toLocaleDateString()}
+              {t('projectPeriod')}: {new Date(selectedProjectData.startDate).toLocaleDateString()} - {new Date(selectedProjectData.endDate).toLocaleDateString()}
             </p>
           )}
         </div>
 
         <div className="md:col-span-2">
           <Input
-            label="Tags"
-            placeholder="Enter tags separated by commas"
+            label={t('tags')}
+            placeholder={t('enterTags')}
             error={errors.tags?.message}
             {...register('tags')}
           />
           <p className="text-sm text-gray-500 mt-1">
-            Separate multiple tags with commas (e.g., bug, frontend, urgent)
+            {t('separateTagsComma')}
           </p>
         </div>
       </div>
@@ -395,10 +413,10 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
       {/* Task Dependencies */}
       {task && (
         <div className="border-t pt-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Dependencies</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">{t('dependencies')}</h3>
           <div className="bg-gray-50 rounded-lg p-4">
             <p className="text-sm text-gray-600">
-              Task dependencies will be managed in the detail view after creation.
+              {t('dependenciesManaged')}
             </p>
           </div>
         </div>
@@ -411,14 +429,14 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
           onClick={onCancel}
           disabled={loading}
         >
-          Cancel
+          {t('cancel')}
         </Button>
         <Button
           type="submit"
           loading={loading}
           disabled={!selectedProject}
         >
-          {task ? 'Update Task' : 'Create Task'}
+          {task ? t('updateTask') : t('createTask')}
         </Button>
       </div>
     </form>

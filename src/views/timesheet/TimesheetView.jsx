@@ -39,6 +39,7 @@ import { ROLES, TIMESHEET_STATUS } from '@/constants';
 import { formatDate, formatDateTime, formatDuration } from '@/utils';
 import TimesheetForm from './TimesheetForm';
 import WeeklyTimesheetView from './WeeklyTimesheetView';
+import TimesheetMatrix from './TimesheetMatrix';
 import TimerWidget from './TimerWidget';
 
 const statusConfig = {
@@ -75,7 +76,7 @@ const TimesheetView = () => {
   const { pendingApprovals } = useTimesheetApprovals();
   
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState('calendar'); // calendar | list | weekly
+  const [viewMode, setViewMode] = useState('matrix'); // calendar | list | weekly | matrix
   const [filters, setFilters] = useState({
     status: '',
     startDate: '',
@@ -334,6 +335,16 @@ const TimesheetView = () => {
           >
             Weekly
           </button>
+          <button
+            onClick={() => setViewMode('matrix')}
+            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+              viewMode === 'matrix' 
+                ? 'bg-white text-gray-900 shadow-sm' 
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Matrix
+          </button>
         </div>
 
         {/* Filters */}
@@ -559,6 +570,11 @@ const TimesheetView = () => {
           weekStart={currentWeekStart}
           onWeekChange={setCurrentDate}
         />
+      )}
+
+      {/* Matrix View */}
+      {viewMode === 'matrix' && (
+        <TimesheetMatrix />
       )}
 
       {/* Modals */}

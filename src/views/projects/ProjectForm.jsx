@@ -4,10 +4,12 @@ import { Button, Input } from '@/components/ui';
 import { useProjects } from '@/hooks/useProjects';
 import { useAreas } from '@/hooks/useAreas';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/hooks/useTranslation';
 import { ROLES } from '@/constants';
 
 const ProjectForm = ({ project, onSuccess, onCancel }) => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const { createProject, updateProject, loading } = useProjects();
   const { areas } = useAreas();
   const [selectedArea, setSelectedArea] = useState(project?.areaId || user?.areaId || '');
@@ -53,7 +55,10 @@ const ProjectForm = ({ project, onSuccess, onCancel }) => {
   const onSubmit = async (data) => {
     try {
       const projectData = {
-        ...data,
+        name: data.name,
+        description: data.description,
+        status: data.status,
+        priority: data.priority,
         estimatedHours: parseInt(data.estimatedHours) || 0,
         startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
         endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
@@ -66,19 +71,18 @@ const ProjectForm = ({ project, onSuccess, onCancel }) => {
         await createProject(projectData);
       }
 
+      // Llamar onSuccess solo después de que la operación se haya completado exitosamente
       onSuccess();
     } catch (error) {
       console.error('Error saving project:', error);
+      // No llamar onSuccess si hay un error
     }
-  };
-
-  const handleAreaChange = (areaId) => {
+  }; const handleAreaChange = (areaId) => {
     setSelectedArea(areaId);
     setValue('areaId', areaId);
   };
 
   const isAdmin = user?.role === ROLES.ADMIN;
-  const isManager = user?.role === ROLES.MANAGER;
 
   // Managers can only create projects in their own area
   const availableAreas = isAdmin ? areas : areas.filter(area => area.id === user?.areaId);
@@ -88,18 +92,18 @@ const ProjectForm = ({ project, onSuccess, onCancel }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="md:col-span-2">
           <Input
-            label="Project Name"
+            label={t('projectName')}
             required
             error={errors.name?.message}
             {...register('name', {
-              required: 'Project name is required',
+              required: t('projectNameRequired'),
               minLength: {
                 value: 3,
-                message: 'Project name must be at least 3 characters',
+                message: t('projectNameMinLength'),
               },
               maxLength: {
                 value: 200,
-                message: 'Project name must not exceed 200 characters',
+                message: t('projectNameMaxLength'),
               },
             })}
           />
@@ -107,15 +111,15 @@ const ProjectForm = ({ project, onSuccess, onCancel }) => {
 
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Description
+            {t('description')}
           </label>
           <textarea
             className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            placeholder="Enter project description..."
+            placeholder={t('enterProjectDescription')}
             {...register('description', {
               maxLength: {
                 value: 1000,
-                message: 'Description must not exceed 1000 characters',
+                message: t('descriptionMaxLength'),
               },
             })}
           />
@@ -126,7 +130,7 @@ const ProjectForm = ({ project, onSuccess, onCancel }) => {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Area <span className="text-red-500">*</span>
+            {t('area')} <span className="text-red-500">*</span>
           </label>
           <select
             value={selectedArea}
@@ -134,7 +138,7 @@ const ProjectForm = ({ project, onSuccess, onCancel }) => {
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             required
           >
-            <option value="">Select an area</option>
+            <option value="">{t('selectArea')}</option>
             {availableAreas && availableAreas.map((area) => (
               <option key={area.id} value={area.id}>
                 {area.name}
@@ -142,55 +146,55 @@ const ProjectForm = ({ project, onSuccess, onCancel }) => {
             ))}
           </select>
           {!selectedArea && (
-            <p className="text-sm text-red-600 mt-1">Area is required</p>
+            <p className="text-sm text-red-600 mt-1">{t('areaRequired')}</p>
           )}
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Priority
+            {t('priority')}
           </label>
           <select
             {...register('priority')}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            <option value="LOW">Low</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HIGH">High</option>
-            <option value="URGENT">Urgent</option>
+            <option value="LOW">{t('low')}</option>
+            <option value="MEDIUM">{t('medium')}</option>
+            <option value="HIGH">{t('high')}</option>
+            <option value="URGENT">{t('urgent')}</option>
           </select>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Status
+            {t('status')}
           </label>
           <select
             {...register('status')}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            <option value="ACTIVE">Active</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="ON_HOLD">On Hold</option>
-            <option value="CANCELLED">Cancelled</option>
+            <option value="ACTIVE">{t('active')}</option>
+            <option value="COMPLETED">{t('completed')}</option>
+            <option value="ON_HOLD">{t('onHold')}</option>
+            <option value="CANCELLED">{t('cancelled')}</option>
           </select>
         </div>
 
         <div>
           <Input
-            label="Estimated Hours"
+            label={t('estimatedHours')}
             type="number"
             min="1"
-            placeholder="Enter estimated hours"
+            placeholder={t('enterEstimatedHours')}
             error={errors.estimatedHours?.message}
             {...register('estimatedHours', {
               min: {
                 value: 1,
-                message: 'Estimated hours must be at least 1',
+                message: t('estimatedHoursMin'),
               },
               max: {
                 value: 10000,
-                message: 'Estimated hours must not exceed 10,000',
+                message: t('estimatedHoursMax'),
               },
             })}
           />
@@ -198,25 +202,25 @@ const ProjectForm = ({ project, onSuccess, onCancel }) => {
 
         <div>
           <Input
-            label="Start Date"
+            label={t('startDate')}
             type="date"
             error={errors.startDate?.message}
             {...register('startDate', {
-              required: 'Start date is required',
+              required: t('startDateRequired'),
             })}
           />
         </div>
 
         <div>
           <Input
-            label="End Date"
+            label={t('endDate')}
             type="date"
             error={errors.endDate?.message}
             {...register('endDate', {
-              required: 'End date is required',
+              required: t('endDateRequired'),
               validate: (value) => {
                 if (startDate && value && new Date(value) <= new Date(startDate)) {
-                  return 'End date must be after start date';
+                  return t('endDateAfterStart');
                 }
                 return true;
               },
@@ -232,14 +236,14 @@ const ProjectForm = ({ project, onSuccess, onCancel }) => {
           onClick={onCancel}
           disabled={loading}
         >
-          Cancel
+          {t('cancel')}
         </Button>
         <Button
           type="submit"
           loading={loading}
           disabled={!selectedArea}
         >
-          {project ? 'Update Project' : 'Create Project'}
+          {project ? t('updateProject') : t('createProject')}
         </Button>
       </div>
     </form>
