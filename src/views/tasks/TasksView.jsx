@@ -18,7 +18,9 @@ import {
   AlertCircle,
   Timer,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  UserPlus,
+  X
 } from 'lucide-react';
 import {
   Button,
@@ -44,6 +46,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { ROLES, TASK_STATUS, TASK_PRIORITY } from '@/constants';
 import { formatDate, formatDuration } from '@/utils';
 import TaskForm from './TaskForm';
+import BulkAssignModal from './BulkAssignModal';
 
 const TasksView = () => {
   const navigate = useNavigate();
@@ -101,6 +104,8 @@ const TasksView = () => {
   const [taskToDelete, setTaskToDelete] = useState(null);
   const [viewMode, setViewMode] = useState('list'); // grid | list | kanban
   const [expandedProjects, setExpandedProjects] = useState(new Set());
+  const [selectedTasks, setSelectedTasks] = useState(new Set());
+  const [showBulkAssign, setShowBulkAssign] = useState(false);
 
   const isAdmin = user?.role === ROLES.ADMIN;
   const isManager = user?.role === ROLES.MANAGER;
@@ -108,6 +113,7 @@ const TasksView = () => {
 
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value };
+    console.log('Aplicando filtros:', newFilters);
     setFilters(newFilters);
     fetchTasks(newFilters);
   };
@@ -150,6 +156,41 @@ const TasksView = () => {
     } catch (error) {
       console.error('Error updating task status:', error);
     }
+  };
+
+  // Funciones para selección múltiple
+  const handleTaskSelect = (taskId) => {
+    console.log('Selecting task:', taskId);
+    const newSelected = new Set(selectedTasks);
+    if (newSelected.has(taskId)) {
+      newSelected.delete(taskId);
+    } else {
+      newSelected.add(taskId);
+    }
+    console.log('New selection:', newSelected);
+    setSelectedTasks(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedTasks.size === tasks?.length) {
+      setSelectedTasks(new Set());
+    } else {
+      setSelectedTasks(new Set(tasks?.map(task => task.id) || []));
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedTasks(new Set());
+  };
+
+  const handleBulkAssign = () => {
+    setShowBulkAssign(true);
+  };
+
+  const handleBulkAssignSuccess = async () => {
+    setSelectedTasks(new Set());
+    setShowBulkAssign(false);
+    await fetchTasks(filters);
   };
 
   const calculateProgress = (task) => {
@@ -213,9 +254,9 @@ const TasksView = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tasks</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('tasks')}</h1>
           <p className="text-gray-600">
-            Manage and track task progress across your projects
+            {t('manageTaskProgress')}
           </p>
         </div>
         <div className="flex items-center space-x-3">
@@ -224,36 +265,36 @@ const TasksView = () => {
             <button
               onClick={() => setViewMode('grid')}
               className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === 'grid'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
-              Grid
+              {t('grid')}
             </button>
             <button
               onClick={() => setViewMode('list')}
               className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === 'list'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
-              List
+              {t('list')}
             </button>
             <button
               onClick={() => setViewMode('kanban')}
               className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === 'kanban'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
-              Kanban
+              {t('kanban')}
             </button>
           </div>
 
           {canCreateTasks && (
             <Button onClick={() => setShowForm(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              New Task
+              {t('newTask')}
             </Button>
           )}
         </div>
@@ -264,7 +305,7 @@ const TasksView = () => {
         <CardHeader>
           <CardTitle className="text-lg flex items-center">
             <Filter className="h-5 w-5 mr-2" />
-            Filters
+            {t('filters')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -272,7 +313,7 @@ const TasksView = () => {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                placeholder="Search tasks..."
+                placeholder={t('searchTasks')}
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
                 className="pl-10"
@@ -284,11 +325,11 @@ const TasksView = () => {
               onChange={(e) => handleFilterChange('status', e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="">All Status</option>
-              <option value={TASK_STATUS.TODO}>To Do</option>
-              <option value={TASK_STATUS.IN_PROGRESS}>In Progress</option>
-              <option value={TASK_STATUS.REVIEW}>Review</option>
-              <option value={TASK_STATUS.DONE}>Done</option>
+              <option value="">{t('allStatus')}</option>
+              <option value={TASK_STATUS.TODO}>{t('todo')}</option>
+              <option value={TASK_STATUS.IN_PROGRESS}>{t('inProgress')}</option>
+              <option value={TASK_STATUS.REVIEW}>{t('inReview')}</option>
+              <option value={TASK_STATUS.DONE}>{t('done')}</option>
             </select>
 
             <select
@@ -296,11 +337,11 @@ const TasksView = () => {
               onChange={(e) => handleFilterChange('priority', e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="">All Priorities</option>
-              <option value={TASK_PRIORITY.LOW}>Low</option>
-              <option value={TASK_PRIORITY.MEDIUM}>Medium</option>
-              <option value={TASK_PRIORITY.HIGH}>High</option>
-              <option value={TASK_PRIORITY.URGENT}>Urgent</option>
+              <option value="">{t('allPriorities')}</option>
+              <option value={TASK_PRIORITY.LOW}>{t('low')}</option>
+              <option value={TASK_PRIORITY.MEDIUM}>{t('medium')}</option>
+              <option value={TASK_PRIORITY.HIGH}>{t('high')}</option>
+              <option value={TASK_PRIORITY.URGENT}>{t('urgent')}</option>
             </select>
 
             <select
@@ -308,7 +349,7 @@ const TasksView = () => {
               onChange={(e) => handleFilterChange('projectId', e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="">All Projects</option>
+              <option value="">{t('allProjects')}</option>
               {projects && projects.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}
@@ -321,9 +362,9 @@ const TasksView = () => {
               onChange={(e) => handleFilterChange('assignedTo', e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="">All Assignees</option>
-              <option value="me">My Tasks</option>
-              <option value="unassigned">Unassigned</option>
+              <option value="">{t('allAssignees')}</option>
+              <option value="me">{t('myTasks')}</option>
+              <option value="unassigned">{t('unassigned')}</option>
             </select>
 
             <Input
@@ -335,6 +376,42 @@ const TasksView = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Toolbar de selección múltiple */}
+      {console.log('Selected tasks count:', selectedTasks.size, 'Selected:', selectedTasks)}
+      {selectedTasks.size > 0 && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-medium text-blue-900">
+                  {selectedTasks.size} tarea{selectedTasks.size !== 1 ? 's' : ''} seleccionada{selectedTasks.size !== 1 ? 's' : ''}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearSelection}
+                  className="h-8"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Limpiar
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleBulkAssign}
+                  size="sm"
+                  className="h-8"
+                  disabled={selectedTasks.size === 0}
+                >
+                  <UserPlus className="h-4 w-4 mr-1" />
+                  Asignar a Usuario
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {error && !error.includes('Backend not available') && (
         <div className="bg-red-50 border border-red-200 rounded-md p-4">
@@ -354,6 +431,7 @@ const TasksView = () => {
       {/* Tasks Grid */}
       {viewMode === 'grid' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {console.log('Tasks loaded:', tasks, 'Count:', tasks?.length)}
           {tasks.map((task) => {
             const progress = calculateProgress(task);
             const overdue = isOverdue(task);
@@ -361,12 +439,18 @@ const TasksView = () => {
             return (
               <Card
                 key={task.id}
-                className={`hover:shadow-lg transition-shadow ${overdue ? 'ring-2 ring-red-200' : ''
-                  }`}
+                className={`hover:shadow-lg transition-shadow ${overdue ? 'ring-2 ring-red-200' : ''} ${selectedTasks.has(task.id) ? 'ring-2 ring-blue-300' : ''}`}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-2 flex-1 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={selectedTasks.has(task.id)}
+                        onChange={() => handleTaskSelect(task.id)}
+                        className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 mb-1">
                         {getStatusIcon(task.status)}
                         <CardTitle className="text-sm truncate">{task.title}</CardTitle>
@@ -386,6 +470,7 @@ const TasksView = () => {
                             Overdue
                           </Badge>
                         )}
+                      </div>
                       </div>
                     </div>
                     <div className="relative ml-2">
@@ -629,6 +714,25 @@ const TasksView = () => {
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead className="w-8">
+                            <input
+                              type="checkbox"
+                              checked={group.tasks.length > 0 && group.tasks.every(task => selectedTasks.has(task.id))}
+                              onChange={() => {
+                                const allSelected = group.tasks.every(task => selectedTasks.has(task.id));
+                                const newSelected = new Set(selectedTasks);
+                                group.tasks.forEach(task => {
+                                  if (allSelected) {
+                                    newSelected.delete(task.id);
+                                  } else {
+                                    newSelected.add(task.id);
+                                  }
+                                });
+                                setSelectedTasks(newSelected);
+                              }}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </TableHead>
                           <TableHead className="w-8"></TableHead>
                           <TableHead>Task</TableHead>
                           <TableHead className="w-24">Priority</TableHead>
@@ -645,7 +749,15 @@ const TasksView = () => {
                           const overdue = isOverdue(task);
 
                           return (
-                            <TableRow key={task.id} className={overdue ? 'bg-red-50' : ''}>
+                            <TableRow key={task.id} className={`${overdue ? 'bg-red-50' : ''} ${selectedTasks.has(task.id) ? 'bg-blue-50' : ''}`}>
+                              <TableCell>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedTasks.has(task.id)}
+                                  onChange={() => handleTaskSelect(task.id)}
+                                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                />
+                              </TableCell>
                               <TableCell>
                                 {getStatusIcon(task.status)}
                               </TableCell>
@@ -872,6 +984,14 @@ const TasksView = () => {
           </p>
         </Modal>
       )}
+
+      {/* Bulk Assign Modal */}
+      <BulkAssignModal
+        isOpen={showBulkAssign}
+        onClose={() => setShowBulkAssign(false)}
+        selectedTaskIds={selectedTasks}
+        onSuccess={handleBulkAssignSuccess}
+      />
     </div>
   );
 };

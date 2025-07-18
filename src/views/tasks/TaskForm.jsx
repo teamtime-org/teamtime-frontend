@@ -14,7 +14,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
   const { projects = [] } = useProjects();
   const [selectedProject, setSelectedProject] = useState(task?.projectId || '');
   const [selectedAssignee, setSelectedAssignee] = useState(
-    task?.assignedTo?.id || task?.assignedToId || ''
+    task?.assignedTo?.id || task?.assignedToId || task?.assignee?.id || task?.assignedTo || ''
   );
 
   const {
@@ -43,11 +43,12 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
 
   useEffect(() => {
     if (task) {
+      const assigneeId = task.assignedTo?.id || task.assignedToId || task.assignee?.id || task.assignedTo || '';
       reset({
         title: task.title,
         description: task.description,
         projectId: task.projectId,
-        assignedToId: task.assignedTo?.id || task.assignedToId || '',
+        assignedToId: assigneeId,
         status: task.status,
         priority: task.priority,
         dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
@@ -55,7 +56,9 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
         tags: task.tags ? task.tags.join(', ') : '',
       });
       setSelectedProject(task.projectId);
-      setSelectedAssignee(task.assignedTo?.id || task.assignedToId || '');
+      setSelectedAssignee(assigneeId);
+      console.log('TaskForm loaded with task:', task);
+      console.log('Assigned to ID:', assigneeId);
     }
   }, [task, reset]);
 
@@ -82,12 +85,15 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
       const taskData = {
         ...data,
         projectId: selectedProject,
-        assignedToId: selectedAssignee || null,
+        assignedTo: selectedAssignee || null,
         createdBy: user.id, // Asegurar que se incluya el ID del usuario que crea la tarea
         estimatedHours: parseInt(data.estimatedHours) || 0,
         dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : null,
         tags: data.tags ? data.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
       };
+
+      // Remover assignedToId si existe en data para evitar conflictos
+      delete taskData.assignedToId;
 
       console.log('Task data to send:', taskData);
 

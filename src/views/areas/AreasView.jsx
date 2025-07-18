@@ -18,7 +18,7 @@ import AreaForm from './AreaForm';
 
 const AreasView = () => {
   const { user } = useAuth();
-  const { areas, loading, error, deleteArea } = useAreas();
+  const { areas, loading, error, deleteArea, fetchAreas } = useAreas();
   const [showForm, setShowForm] = useState(false);
   const [editingArea, setEditingArea] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -49,6 +49,7 @@ const AreasView = () => {
   const handleFormClose = () => {
     setShowForm(false);
     setEditingArea(null);
+    fetchAreas(); // Refrescar la lista después de crear/editar
   };
 
   if (loading && areas.length === 0) {
