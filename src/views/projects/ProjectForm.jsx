@@ -55,7 +55,10 @@ const ProjectForm = ({ project, onSuccess, onCancel }) => {
   const onSubmit = async (data) => {
     try {
       const projectData = {
-        ...data,
+        name: data.name,
+        description: data.description,
+        status: data.status,
+        priority: data.priority,
         estimatedHours: parseInt(data.estimatedHours) || 0,
         startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
         endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
@@ -68,19 +71,18 @@ const ProjectForm = ({ project, onSuccess, onCancel }) => {
         await createProject(projectData);
       }
 
+      // Llamar onSuccess solo después de que la operación se haya completado exitosamente
       onSuccess();
     } catch (error) {
       console.error('Error saving project:', error);
+      // No llamar onSuccess si hay un error
     }
-  };
-
-  const handleAreaChange = (areaId) => {
+  }; const handleAreaChange = (areaId) => {
     setSelectedArea(areaId);
     setValue('areaId', areaId);
   };
 
   const isAdmin = user?.role === ROLES.ADMIN;
-  const isManager = user?.role === ROLES.MANAGER;
 
   // Managers can only create projects in their own area
   const availableAreas = isAdmin ? areas : areas.filter(area => area.id === user?.areaId);

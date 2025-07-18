@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { Button, Input } from '@/components/ui';
 import { useTasks } from '@/hooks/useTasks';
 import { useProjects } from '@/hooks/useProjects';
+import useUsers from '../../hooks/useUsers';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
 import { ROLES, TASK_STATUS, TASK_PRIORITY } from '@/constants';
@@ -12,6 +13,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
   const { t } = useTranslation();
   const { createTask, updateTask, loading } = useTasks();
   const { projects = [] } = useProjects();
+  const { users } = useUsers();
   const [selectedProject, setSelectedProject] = useState(task?.projectId || '');
   const [selectedAssignee, setSelectedAssignee] = useState(
     task?.assignedTo?.id || task?.assignedToId || task?.assignee?.id || task?.assignedTo || ''
@@ -23,7 +25,6 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
     formState: { errors },
     setValue,
     reset,
-    watch,
   } = useForm({
     defaultValues: {
       title: task?.title || '',
@@ -38,7 +39,6 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
     },
   });
 
-  const startDate = watch('startDate');
   const selectedProjectData = projects?.find(p => p.id === selectedProject);
 
   useEffect(() => {
@@ -60,7 +60,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
       console.log('TaskForm loaded with task:', task);
       console.log('Assigned to ID:', assigneeId);
     }
-  }, [task, reset]);
+  }, [task]); // Solo depende de task, no de reset // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSubmit = async (data) => {
     try {
@@ -140,8 +140,9 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
     ? projects
     : projects?.filter(project => project.areaId === user?.areaId);
 
-  // Get available assignees based on selected project
-  const availableAssignees = selectedProjectData?.assignments || [];
+  // Get available assignees - por ahora usamos todos los usuarios
+  // TODO: Filtrar usuarios basado en las asignaciones del proyecto
+  const availableAssignees = users || [];
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -210,15 +211,11 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             {t('assignedTo')}
           </label>
-          <div className={`border border-input rounded-md bg-background ${!selectedProject ? 'opacity-50 cursor-not-allowed' : ''
+          <div className={`border border-input rounded-md bg-background ${availableAssignees.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
             }`}>
-            {!selectedProject ? (
+            {availableAssignees.length === 0 ? (
               <div className="p-3 text-sm text-gray-500">
-                {t('selectProjectFirst')}
-              </div>
-            ) : availableAssignees.length === 0 ? (
-              <div className="p-3 text-sm text-gray-500">
-                {t('noAssigneesAvailable')}
+                {t('noUsersAvailable')}
               </div>
             ) : (
               <div className="max-h-[200px] overflow-y-auto">
@@ -234,18 +231,17 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
                     />
                     <span className="text-sm text-gray-600">{t('unassigned')}</span>
                   </label>
-                  {availableAssignees.map((assignment) => {
-                    // Handle different data structures
-                    const user = assignment.user || assignment;
-                    const userId = user.id || assignment.userId || assignment.id;
+                  {availableAssignees.map((user) => {
+                    // Trabajamos directamente con usuarios
+                    const userId = user.id;
                     const userName = user.firstName && user.lastName
                       ? `${user.firstName} ${user.lastName}`
-                      : user.name || user.fullName || `User ${userId}`;
+                      : user.name || `User ${userId}`;
                     const userEmail = user.email || '';
                     const userInitial = user.firstName?.charAt(0) || user.name?.charAt(0) || userName?.charAt(0) || '?';
 
                     if (!userId) {
-                      console.warn('Assignment without valid user ID:', assignment);
+                      console.warn('User without valid ID:', user);
                       return null;
                     }
 
@@ -291,17 +287,12 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
           {selectedAssignee && (
             <div className="mt-2">
               {(() => {
-                const assignment = availableAssignees.find(a => {
-                  const user = a.user || a;
-                  const userId = user.id || a.userId || a.id;
-                  return userId === selectedAssignee;
-                });
-                if (!assignment) return null;
+                const user = availableAssignees.find(u => u.id === selectedAssignee);
+                if (!user) return null;
 
-                const user = assignment.user || assignment;
                 const userName = user.firstName && user.lastName
                   ? `${user.firstName} ${user.lastName}`
-                  : user.name || user.fullName || `User ${selectedAssignee}`;
+                  : user.name || `User ${selectedAssignee}`;
 
                 return (
                   <div className="flex items-center text-sm text-gray-600">

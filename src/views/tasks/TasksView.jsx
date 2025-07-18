@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -96,7 +96,12 @@ const TasksView = () => {
     dueDate: '',
   });
 
-  const { tasks, loading, error, pagination, fetchTasks, deleteTask, updateTaskStatus } = useTasks(filters);
+  const { tasks, loading, error, pagination, fetchTasks, deleteTask, updateTaskStatus } = useTasks();
+
+  // Fetch tasks when filters change
+  useEffect(() => {
+    fetchTasks(filters);
+  }, [filters, fetchTasks]);
 
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
@@ -115,7 +120,7 @@ const TasksView = () => {
     const newFilters = { ...filters, [key]: value };
     console.log('Aplicando filtros:', newFilters);
     setFilters(newFilters);
-    fetchTasks(newFilters);
+    // fetchTasks se llamará automáticamente por el useEffect
   };
 
   const handleEdit = (task) => {
@@ -171,13 +176,13 @@ const TasksView = () => {
     setSelectedTasks(newSelected);
   };
 
-  const handleSelectAll = () => {
-    if (selectedTasks.size === tasks?.length) {
-      setSelectedTasks(new Set());
-    } else {
-      setSelectedTasks(new Set(tasks?.map(task => task.id) || []));
-    }
-  };
+  // const handleSelectAll = () => {
+  //   if (selectedTasks.size === tasks?.length) {
+  //     setSelectedTasks(new Set());
+  //   } else {
+  //     setSelectedTasks(new Set(tasks?.map(task => task.id) || []));
+  //   }
+  // };
 
   const handleClearSelection = () => {
     setSelectedTasks(new Set());
@@ -451,26 +456,26 @@ const TasksView = () => {
                         className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                       />
                       <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 mb-1">
-                        {getStatusIcon(task.status)}
-                        <CardTitle className="text-sm truncate">{task.title}</CardTitle>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge
-                          variant={priorityConfig[task.priority]?.variant}
-                          className={`${priorityConfig[task.priority]?.color} text-xs`}
-                        >
-                          {priorityConfig[task.priority]?.label}
-                        </Badge>
-                        <Badge variant={statusConfig[task.status]?.variant} className="text-xs">
-                          {statusConfig[task.status]?.label}
-                        </Badge>
-                        {overdue && (
-                          <Badge variant="danger" className="text-xs">
-                            Overdue
+                        <div className="flex items-center space-x-2 mb-1">
+                          {getStatusIcon(task.status)}
+                          <CardTitle className="text-sm truncate">{task.title}</CardTitle>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge
+                            variant={priorityConfig[task.priority]?.variant}
+                            className={`${priorityConfig[task.priority]?.color} text-xs`}
+                          >
+                            {priorityConfig[task.priority]?.label}
                           </Badge>
-                        )}
-                      </div>
+                          <Badge variant={statusConfig[task.status]?.variant} className="text-xs">
+                            {statusConfig[task.status]?.label}
+                          </Badge>
+                          {overdue && (
+                            <Badge variant="danger" className="text-xs">
+                              Overdue
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="relative ml-2">
@@ -544,10 +549,15 @@ const TasksView = () => {
                       </div>
                     )}
 
-                    {task.assignedTo && (
+                    {task.assignee && (
                       <div className="flex items-center">
                         <Users className="h-3 w-3 mr-2 text-gray-400" />
-                        <span className="text-gray-600">{task.assignedTo.name}</span>
+                        <span className="text-gray-600">
+                          {task.assignee.firstName && task.assignee.lastName
+                            ? `${task.assignee.firstName} ${task.assignee.lastName}`
+                            : task.assignee.name || task.assignee.email || t('unknown')
+                          }
+                        </span>
                       </div>
                     )}
 
@@ -791,22 +801,43 @@ const TasksView = () => {
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center">
-                                  {task.assignedTo ? (
+                                  {task.assignee ? (
                                     <>
                                       <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center mr-2">
                                         <span className="text-xs font-medium">
-                                          {task.assignedTo.firstName?.charAt(0) || task.assignedTo.name?.charAt(0) || '?'}
+                                          {(() => {
+                                            // Obtener las iniciales del nombre
+                                            if (task.assignee.firstName) {
+                                              return task.assignee.firstName.charAt(0).toUpperCase();
+                                            }
+                                            if (task.assignee.name) {
+                                              return task.assignee.name.charAt(0).toUpperCase();
+                                            }
+                                            if (task.assignee.email) {
+                                              return task.assignee.email.charAt(0).toUpperCase();
+                                            }
+                                            return '?';
+                                          })()}
                                         </span>
                                       </div>
                                       <span className="text-xs text-gray-600 truncate">
-                                        {task.assignedTo.firstName && task.assignedTo.lastName
-                                          ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}`
-                                          : task.assignedTo.name || 'Unknown'
-                                        }
+                                        {(() => {
+                                          // Mostrar el nombre completo
+                                          if (task.assignee.firstName && task.assignee.lastName) {
+                                            return `${task.assignee.firstName} ${task.assignee.lastName}`;
+                                          }
+                                          if (task.assignee.name) {
+                                            return task.assignee.name;
+                                          }
+                                          if (task.assignee.email) {
+                                            return task.assignee.email;
+                                          }
+                                          return t('unknown');
+                                        })()}
                                       </span>
                                     </>
                                   ) : (
-                                    <span className="text-xs text-gray-400">Unassigned</span>
+                                    <span className="text-xs text-gray-400">{t('unassigned')}</span>
                                   )}
                                 </div>
                               </TableCell>

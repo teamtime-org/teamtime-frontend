@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { projectService } from '@/services/projectService';
 
-export const useProjects = (initialParams = {}) => {
+export const useProjects = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -16,9 +16,9 @@ export const useProjects = (initialParams = {}) => {
     try {
       setLoading(true);
       setError(null);
-      const queryParams = { ...initialParams, ...params };
+      const queryParams = { ...params };
       const response = await projectService.getAll(queryParams);
-      
+
       setProjects(response.data?.projects || []);
       setPagination({
         page: response.data?.page || 1,
@@ -31,14 +31,17 @@ export const useProjects = (initialParams = {}) => {
     } finally {
       setLoading(false);
     }
-  }, []); // Remove initialParams dependency to prevent infinite loop
+  }, []); // Sin dependencias para evitar bucles infinitos
 
   const createProject = async (projectData) => {
     try {
       setLoading(true);
       setError(null);
       const response = await projectService.create(projectData);
-      await fetchProjects(); // Refresh the list
+
+      // Refrescar la lista para asegurar que se muestre el nuevo proyecto
+      await fetchProjects();
+
       return response.data;
     } catch (err) {
       setError(err.response?.data?.message || 'Error creating project');
@@ -53,7 +56,7 @@ export const useProjects = (initialParams = {}) => {
       setLoading(true);
       setError(null);
       const response = await projectService.update(id, projectData);
-      setProjects(prev => prev.map(project => 
+      setProjects(prev => prev.map(project =>
         project.id === id ? response.data : project
       ));
       return response.data;
@@ -81,7 +84,8 @@ export const useProjects = (initialParams = {}) => {
 
   useEffect(() => {
     fetchProjects();
-  }, [fetchProjects]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Solo ejecutar una vez al montar
 
   return {
     projects,
@@ -102,7 +106,7 @@ export const useProject = (id) => {
 
   const fetchProject = useCallback(async () => {
     if (!id) return;
-    
+
     try {
       setLoading(true);
       setError(null);

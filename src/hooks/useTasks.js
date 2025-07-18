@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { taskService } from '@/services/taskService';
 
-export const useTasks = (initialParams = {}) => {
+export const useTasks = () => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -16,9 +16,8 @@ export const useTasks = (initialParams = {}) => {
     try {
       setLoading(true);
       setError(null);
-      const queryParams = { ...initialParams, ...params };
-      const response = await taskService.getAll(queryParams);
-      
+      const response = await taskService.getAll(params);
+
       setTasks(response.data?.tasks || []);
       setPagination({
         page: 1, // Backend no está enviando pagination, usar defaults
@@ -39,7 +38,7 @@ export const useTasks = (initialParams = {}) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []); // Sin dependencias para mantenerlo estable
 
   const createTask = async (taskData) => {
     try {
@@ -62,11 +61,11 @@ export const useTasks = (initialParams = {}) => {
       setLoading(true);
       setError(null);
       const response = await taskService.update(id, taskData);
-      
+
       // Actualizar la tarea específica en el estado local con todos los datos
-      setTasks(prev => prev.map(task => 
-        task.id === id ? { 
-          ...task, 
+      setTasks(prev => prev.map(task =>
+        task.id === id ? {
+          ...task,
           ...response.data,
           // Asegurarse de que las relaciones se mantengan si existen
           project: response.data.project || task.project,
@@ -74,7 +73,7 @@ export const useTasks = (initialParams = {}) => {
           creator: response.data.creator || task.creator
         } : task
       ));
-      
+
       return response.data;
     } catch (err) {
       setError(err.response?.data?.message || 'Error updating task');
@@ -103,7 +102,7 @@ export const useTasks = (initialParams = {}) => {
       setLoading(true);
       setError(null);
       const response = await taskService.updateStatus(id, status);
-      setTasks(prev => prev.map(task => 
+      setTasks(prev => prev.map(task =>
         task.id === id ? { ...task, status } : task
       ));
       return response.data;
@@ -120,7 +119,7 @@ export const useTasks = (initialParams = {}) => {
       setLoading(true);
       setError(null);
       const response = await taskService.updatePriority(id, priority);
-      setTasks(prev => prev.map(task => 
+      setTasks(prev => prev.map(task =>
         task.id === id ? { ...task, priority } : task
       ));
       return response.data;
@@ -150,9 +149,10 @@ export const useTasks = (initialParams = {}) => {
     }
   };
 
-  useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
+  // No fetch automático, se hará desde el componente
+  // useEffect(() => {
+  //   fetchTasks();
+  // }, [fetchTasks]);
 
   return {
     tasks,
@@ -177,7 +177,7 @@ export const useTask = (id) => {
 
   const fetchTask = useCallback(async () => {
     if (!id) return;
-    
+
     try {
       setLoading(true);
       setError(null);
@@ -209,7 +209,7 @@ export const useTaskComments = (taskId) => {
 
   const fetchComments = useCallback(async () => {
     if (!taskId) return;
-    
+
     try {
       setLoading(true);
       setError(null);
@@ -242,7 +242,7 @@ export const useTaskComments = (taskId) => {
       setLoading(true);
       setError(null);
       const response = await taskService.updateComment(taskId, commentId, comment);
-      setComments(prev => prev.map(c => 
+      setComments(prev => prev.map(c =>
         c.id === commentId ? response.data : c
       ));
       return response.data;
@@ -291,7 +291,7 @@ export const useTaskTimeTracking = (taskId) => {
 
   const fetchTimeEntries = useCallback(async () => {
     if (!taskId) return;
-    
+
     try {
       setLoading(true);
       setError(null);

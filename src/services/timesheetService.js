@@ -2,6 +2,12 @@ import api from '@/services/api';
 
 export const timesheetService = {
   // Get all time entries with filtering and pagination
+  getAll: async (params = {}) => {
+    const response = await api.get('/time-entries', { params });
+    return response.data;
+  },
+
+  // Get all time entries with filtering and pagination
   getTimeEntries: async (params = {}) => {
     const response = await api.get('/time-entries', { params });
     return response.data;
@@ -182,6 +188,113 @@ export const timesheetService = {
   getUserSummary: async (userId, filters = {}) => {
     const response = await api.get(`/time-entries/user/${userId}/summary`, { params: filters });
     return response.data;
+  },
+
+  // Create time entry (alias for createTimeEntry)
+  create: async (entryData) => {
+    const response = await api.post('/time-entries', entryData);
+    return response.data;
+  },
+
+  // Update time entry (alias for updateTimeEntry)
+  update: async (id, entryData) => {
+    const response = await api.put(`/time-entries/${id}`, entryData);
+    return response.data;
+  },
+
+  // Delete time entry (alias for deleteTimeEntry)
+  delete: async (id) => {
+    const response = await api.delete(`/time-entries/${id}`);
+    return response.data;
+  },
+
+  // Get time entry by ID (alias for getTimeEntryById)
+  getById: async (id) => {
+    const response = await api.get(`/time-entries/${id}`);
+    return response.data;
+  },
+
+  // Placeholder methods for missing functionality
+  submit: async (id) => {
+    console.warn('Submit functionality not yet implemented');
+    throw new Error('Submit functionality not yet implemented');
+  },
+
+  approve: async (id, approvalData = {}) => {
+    console.warn('Approve functionality not yet implemented');
+    throw new Error('Approve functionality not yet implemented');
+  },
+
+  reject: async (id, rejectionData) => {
+    console.warn('Reject functionality not yet implemented');
+    throw new Error('Reject functionality not yet implemented');
+  },
+
+  getWeeklyTimesheet: async (weekStart, userId = null) => {
+    console.warn('Weekly timesheet functionality not yet implemented');
+    throw new Error('Weekly timesheet functionality not yet implemented');
+  },
+
+  addTimeEntry: async (timesheetId, entryData) => {
+    console.warn('Add time entry functionality not yet implemented');
+    throw new Error('Add time entry functionality not yet implemented');
+  },
+
+  updateTimeEntry: async (timesheetId, entryId, entryData) => {
+    console.warn('Update time entry functionality not yet implemented');  
+    throw new Error('Update time entry functionality not yet implemented');
+  },
+
+  deleteTimeEntry: async (timesheetId, entryId) => {
+    console.warn('Delete time entry functionality not yet implemented');
+    throw new Error('Delete time entry functionality not yet implemented');
+  },
+
+  bulkUpdateEntries: async (timesheetId, entries) => {
+    console.warn('Bulk update entries functionality not yet implemented');
+    throw new Error('Bulk update entries functionality not yet implemented');
+  },
+
+  // Timer functionality placeholders
+  startTimer: async (taskId, description = '') => {
+    console.warn('Timer functionality not yet implemented');
+    throw new Error('Timer functionality not yet implemented');
+  },
+
+  stopTimer: async () => {
+    console.warn('Timer functionality not yet implemented');
+    throw new Error('Timer functionality not yet implemented');
+  },
+
+  getCurrentTimer: async () => {
+    console.warn('Timer functionality not yet implemented');
+    throw new Error('Timer functionality not yet implemented');
+  },
+
+  getTimerHistory: async (params = {}) => {
+    console.warn('Timer functionality not yet implemented');
+    throw new Error('Timer functionality not yet implemented');
+  },
+
+  updateTimer: async (timerId, timerData) => {
+    console.warn('Timer functionality not yet implemented');
+    throw new Error('Timer functionality not yet implemented');
+  },
+
+  deleteTimer: async (timerId) => {
+    console.warn('Timer functionality not yet implemented');
+    throw new Error('Timer functionality not yet implemented');
+  },
+
+  // Approval functionality placeholders
+  getPendingApprovals: async (params = {}) => {
+    console.warn('Pending approvals functionality not yet implemented');
+    throw new Error('Pending approvals functionality not yet implemented');
+  },
+
+  getTeamTimesheets: async (params = {}) => {
+    console.warn('Team timesheets functionality not yet implemented');
+    throw new Error('Team timesheets functionality not yet implemented');
   },
 
   // Note: Validation and comments not yet implemented

@@ -60,7 +60,6 @@ export const translations = {
         endDate: 'Fecha de Fin',
         area: 'Área',
         estimatedHours: 'Horas Estimadas',
-        createProject: 'Crear Proyecto',
         updateProject: 'Actualizar Proyecto',
         selectArea: 'Seleccionar un área',
         enterProjectDescription: 'Ingresa la descripción del proyecto...',
@@ -157,6 +156,9 @@ export const translations = {
         page: 'Página',
         previous: 'Anterior',
         next: 'Siguiente',
+        noUsersAvailable: 'No hay usuarios disponibles',
+        loadingUsers: 'Cargando usuarios...',
+        unknown: 'Desconocido',
 
         // Hoja de tiempo
         timeEntry: 'Entrada de Tiempo',

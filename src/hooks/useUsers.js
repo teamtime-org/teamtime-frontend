@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import userService from '../services/userService';
 
 const useUsers = () => {
@@ -12,10 +12,10 @@ const useUsers = () => {
     pages: 0
   });
 
-  const fetchUsers = async (page = 1, limit = 10, search = '', role = '') => {
+  const fetchUsers = useCallback(async (page = 1, limit = 10, search = '', role = '') => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const response = await userService.getUsers(page, limit, search, role);
       setUsers(response.data?.users || []);
@@ -31,7 +31,7 @@ const useUsers = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // Sin dependencias para mantenerla estable
 
   const createUser = async (userData) => {
     try {
@@ -83,7 +83,7 @@ const useUsers = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]); // fetchUsers es estable gracias a useCallback
 
   return {
     users,

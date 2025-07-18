@@ -57,7 +57,7 @@ const ProjectsView = () => {
     areaId: '',
   });
 
-  const { projects, loading, error, pagination, fetchProjects, deleteProject } = useProjects(filters);
+  const { projects, loading, error, pagination, fetchProjects, deleteProject } = useProjects();
 
   const [showForm, setShowForm] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
@@ -97,6 +97,8 @@ const ProjectsView = () => {
   const handleFormClose = () => {
     setShowForm(false);
     setEditingProject(null);
+    // El hook useProjects ya se encarga de actualizar la lista automáticamente
+    // No necesitamos llamar fetchProjects() aquí
   };
 
   const calculateProgress = (project) => {
