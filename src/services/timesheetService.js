@@ -235,21 +235,6 @@ export const timesheetService = {
     throw new Error('Weekly timesheet functionality not yet implemented');
   },
 
-  addTimeEntry: async (timesheetId, entryData) => {
-    console.warn('Add time entry functionality not yet implemented');
-    throw new Error('Add time entry functionality not yet implemented');
-  },
-
-  updateTimeEntry: async (timesheetId, entryId, entryData) => {
-    console.warn('Update time entry functionality not yet implemented');  
-    throw new Error('Update time entry functionality not yet implemented');
-  },
-
-  deleteTimeEntry: async (timesheetId, entryId) => {
-    console.warn('Delete time entry functionality not yet implemented');
-    throw new Error('Delete time entry functionality not yet implemented');
-  },
-
   bulkUpdateEntries: async (timesheetId, entries) => {
     console.warn('Bulk update entries functionality not yet implemented');
     throw new Error('Bulk update entries functionality not yet implemented');

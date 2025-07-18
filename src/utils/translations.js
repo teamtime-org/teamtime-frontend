@@ -168,6 +168,12 @@ export const translations = {
         comments: 'Comentarios',
         addEntry: 'Agregar Entrada',
         totalHours: 'Horas Totales',
+        timesheetMatrix: 'Matriz de Captura de Horas',
+        weeklyTimesheet: 'Hoja de Tiempo Semanal',
+        noTasksAssigned: 'No tienes tareas asignadas',
+        noTasksAssignedMessage: 'Contacta a tu administrador para que te asigne tareas a proyectos.',
+        projectTask: 'Proyecto / Tarea',
+        total: 'Total',
 
         // Usuarios
         newUser: 'Nuevo Usuario',
