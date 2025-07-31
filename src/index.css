@@ -9,3 +9,57 @@
     font-family: 'Inter', sans-serif;
   }
 }
+
+@layer components {
+  /* Estilos para scrollbar personalizado en tablas */
+  .table-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #CBD5E0 #F7FAFC;
+  }
+  
+  .table-scroll::-webkit-scrollbar {
+    height: 8px;
+  }
+  
+  .table-scroll::-webkit-scrollbar-track {
+    background: #F7FAFC;
+    border-radius: 10px;
+  }
+  
+  .table-scroll::-webkit-scrollbar-thumb {
+    background: #CBD5E0;
+    border-radius: 10px;
+  }
+  
+  .table-scroll::-webkit-scrollbar-thumb:hover {
+    background: #A0AEC0;
+  }
+  
+  /* Mejorar truncate para elementos con contenido dinámico */
+  .text-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  /* Estilos para columnas fijas en tablas responsivas */
+  .sticky-column-left {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    border-right: 1px solid #E5E7EB;
+  }
+  
+  .sticky-column-right {
+    position: sticky;
+    right: 0;
+    z-index: 10;
+    border-left: 1px solid #E5E7EB;
+  }
+  
+  /* Mejorar el hover para filas de tabla */
+  .table-row-hover:hover .sticky-column-left,
+  .table-row-hover:hover .sticky-column-right {
+    background-color: #F9FAFB;
+  }
+}

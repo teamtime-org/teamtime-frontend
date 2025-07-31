@@ -25,10 +25,23 @@ export const formatDuration = (hours) => {
   if (!hours || hours === 0) return '0h';
   const wholeHours = Math.floor(hours);
   const minutes = Math.round((hours - wholeHours) * 60);
-  
+
   if (minutes === 0) return `${wholeHours}h`;
   if (wholeHours === 0) return `${minutes}m`;
   return `${wholeHours}h ${minutes}m`;
+};
+
+export const formatCurrency = (amount, currency = 'MXN') => {
+  if (!amount || amount === 0) return '$0';
+
+  const formatter = new Intl.NumberFormat('es-MX', {
+    style: 'currency',
+    currency: currency === 'MXN' ? 'MXN' : 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+
+  return formatter.format(amount);
 };
 
 export const calculateHoursBetween = (startDate, endDate) => {
@@ -91,7 +104,7 @@ export const sortBy = (array, key, order = 'asc') => {
   return [...array].sort((a, b) => {
     const aValue = a[key];
     const bValue = b[key];
-    
+
     if (aValue < bValue) return order === 'asc' ? -1 : 1;
     if (aValue > bValue) return order === 'asc' ? 1 : -1;
     return 0;
@@ -100,13 +113,13 @@ export const sortBy = (array, key, order = 'asc') => {
 
 export const formatBytes = (bytes, decimals = 2) => {
   if (bytes === 0) return '0 Bytes';
-  
+
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-  
+
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 };
 
