@@ -12,6 +12,12 @@ export const projectService = {
     if (params.priority) searchParams.append('priority', params.priority);
     if (params.areaId) searchParams.append('areaId', params.areaId);
     if (params.userId) searchParams.append('userId', params.userId);
+    // Excel filters
+    if (params.mentorId) searchParams.append('mentorId', params.mentorId);
+    if (params.coordinatorId) searchParams.append('coordinatorId', params.coordinatorId);
+    if (params.salesManagementId) searchParams.append('salesManagementId', params.salesManagementId);
+    if (params.salesExecutiveId) searchParams.append('salesExecutiveId', params.salesExecutiveId);
+    if (params.siebelOrderNumber) searchParams.append('siebelOrderNumber', params.siebelOrderNumber);
     
     const queryString = searchParams.toString();
     const response = await api.get(`/projects${queryString ? `?${queryString}` : ''}`);

@@ -9,6 +9,7 @@ import DashboardView from '@/views/dashboard/DashboardView';
 import AreasView from '@/views/areas/AreasView';
 import ProjectsView from '@/views/projects/ProjectsView';
 import ProjectDetailView from '@/views/projects/ProjectDetailView';
+import { ExcelImportView } from '@/views/projects';
 import { TasksView, TaskDetailView } from '@/views/tasks';
 import { TimesheetView } from '@/views/timesheet';
 import ReportsView from '@/views/reports/ReportsView';
@@ -35,6 +36,11 @@ function App() {
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<DashboardView />} />
               <Route path="projects" element={<ProjectsView />} />
+              <Route path="projects/import" element={
+                <ProtectedRoute requiredRole={ROLES.ADMINISTRADOR}>
+                  <ExcelImportView />
+                </ProtectedRoute>
+              } />
               <Route path="projects/:id" element={<ProjectDetailView />} />
               <Route path="tasks" element={<TasksView />} />
               <Route path="tasks/:id" element={<TaskDetailView />} />
