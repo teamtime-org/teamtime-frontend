@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -31,6 +31,7 @@ import { useProjects } from '@/hooks/useProjects';
 import { useAreas } from '@/hooks/useAreas';
 import { useCatalogs } from '@/hooks/useCatalogs';
 import { useAuth } from '@/hooks/useAuth';
+import useUsers from '@/hooks/useUsers';
 import { useTranslation } from '@/hooks/useTranslation';
 import { ROLES, PROJECT_STATUS } from '@/constants';
 import { formatDate, formatDuration } from '@/utils';
@@ -42,6 +43,7 @@ const ProjectsView = () => {
   const { t } = useTranslation();
   const { areas } = useAreas();
   const { salesManagements, mentors, coordinators } = useCatalogs();
+  const { users, fetchAllUsers: loadAllUsers } = useUsers();
 
   const statusConfig = {
     [PROJECT_STATUS.ACTIVE]: { variant: 'success', label: t('active') },
@@ -62,7 +64,9 @@ const ProjectsView = () => {
     status: '',
     priority: '',
     areaId: '',
-    // Nuevos filtros de Excel
+    // Filtros de asignaciones reales
+    assignedUserId: '', // Para usuarios asignados al proyecto
+    // Filtros de Excel (mantener para compatibilidad)
     mentorId: '',
     coordinatorId: '',
     salesManagementId: '',
@@ -85,6 +89,11 @@ const ProjectsView = () => {
   const isManager = user?.role === ROLES.MANAGER;
   const canCreateProjects = isAdmin || isManager;
 
+  // Cargar todos los usuarios para el filtro
+  useEffect(() => {
+    loadAllUsers();
+  }, [loadAllUsers]);
+
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
@@ -103,6 +112,7 @@ const ProjectsView = () => {
       status: '',
       priority: '',
       areaId: '',
+      assignedUserId: '',
       mentorId: '',
       coordinatorId: '',
       salesManagementId: '',
@@ -268,8 +278,22 @@ const ProjectsView = () => {
             </select>
           </div>
 
-          {/* Segunda fila de filtros - Excel Details */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
+          {/* Segunda fila de filtros - Asignaciones y Excel Details */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mt-4">
+            <select
+              value={filters.assignedUserId}
+              onChange={(e) => handleFilterChange('assignedUserId', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Usuarios Asignados</option>
+              <option value="me">Mis Proyectos</option>
+              {users && users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.firstName} {user.lastName}
+                </option>
+              ))}
+            </select>
+
             <select
               value={filters.mentorId}
               onChange={(e) => handleFilterChange('mentorId', e.target.value)}

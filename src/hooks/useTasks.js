@@ -1,6 +1,43 @@
 import { useState, useEffect, useCallback } from 'react';
 import { taskService } from '@/services/taskService';
 
+// Hook para tareas de un proyecto específico
+export const useProjectTasks = (projectId) => {
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchProjectTasks = useCallback(async () => {
+    if (!projectId) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await taskService.getAll({ projectId });
+      setTasks(response.data?.tasks || []);
+    } catch (err) {
+      console.error('Error fetching project tasks:', err);
+      setError(err.response?.data?.message || 'Error loading tasks');
+      setTasks([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    if (projectId) {
+      fetchProjectTasks();
+    }
+  }, [projectId]); // Solo depende de projectId, no de la función
+
+  return {
+    tasks,
+    loading,
+    error,
+    refetch: fetchProjectTasks,
+  };
+};
+
 export const useTasks = () => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -20,18 +57,18 @@ export const useTasks = () => {
 
       setTasks(response.data?.tasks || []);
       setPagination({
-        page: 1, // Backend no está enviando pagination, usar defaults
-        limit: 10,
+        page: response.data?.page || params.page || 1,
+        limit: response.data?.limit || params.limit || 10,
         total: response.data?.total || 0,
-        totalPages: Math.ceil((response.data?.total || 0) / 10),
+        totalPages: response.data?.totalPages || Math.ceil((response.data?.total || 0) / (params.limit || 10)),
       });
     } catch (err) {
       console.error('Error fetching tasks:', err);
       setError(err.response?.data?.message || 'Error loading tasks');
       setTasks([]);
       setPagination({
-        page: 1,
-        limit: 10,
+        page: params.page || 1,
+        limit: params.limit || 10,
         total: 0,
         totalPages: 0,
       });

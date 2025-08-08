@@ -12,6 +12,7 @@ export const projectService = {
     if (params.priority) searchParams.append('priority', params.priority);
     if (params.areaId) searchParams.append('areaId', params.areaId);
     if (params.userId) searchParams.append('userId', params.userId);
+    if (params.assignedUserId) searchParams.append('assignedUserId', params.assignedUserId);
     // Excel filters
     if (params.mentorId) searchParams.append('mentorId', params.mentorId);
     if (params.coordinatorId) searchParams.append('coordinatorId', params.coordinatorId);

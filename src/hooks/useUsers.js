@@ -33,6 +33,32 @@ const useUsers = () => {
     }
   }, []); // Sin dependencias para mantenerla estable
 
+  const fetchAllUsers = useCallback(async (search = '', role = '') => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Primero obtenemos el total para saber cuántos usuarios hay
+      const initialResponse = await userService.getUsers(1, 1, search, role);
+      const total = initialResponse.data?.total || 0;
+      
+      // Luego cargamos todos los usuarios usando el total como límite
+      const response = await userService.getUsers(1, Math.max(total, 500), search, role);
+      setUsers(response.data?.users || []);
+      setPagination({
+        page: 1,
+        limit: total,
+        total: total,
+        pages: 1
+      });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al cargar usuarios');
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const createUser = async (userData) => {
     try {
       const response = await userService.createUser(userData);
@@ -91,10 +117,49 @@ const useUsers = () => {
     error,
     pagination,
     fetchUsers,
+    fetchAllUsers,
     createUser,
     updateUser,
     deleteUser,
     toggleUserStatus
+  };
+};
+
+// Hook para cargar todos los usuarios (usado en formularios)
+export const useAllUsers = () => {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchAllUsers = useCallback(async (search = '', role = '') => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Primero obtenemos el total para saber cuántos usuarios hay
+      const initialResponse = await userService.getUsers(1, 1, search, role);
+      const total = initialResponse.data?.total || 0;
+      
+      // Luego cargamos todos los usuarios usando el total como límite
+      const response = await userService.getUsers(1, Math.max(total, 500), search, role);
+      setUsers(response.data?.users || []);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al cargar usuarios');
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAllUsers();
+  }, [fetchAllUsers]);
+
+  return {
+    users,
+    loading,
+    error,
+    fetchAllUsers,
   };
 };
 

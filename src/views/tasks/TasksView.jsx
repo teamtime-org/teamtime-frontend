@@ -40,9 +40,12 @@ import {
   TableCell
 } from '@/components/ui';
 import { useTasks } from '@/hooks/useTasks';
-import { useProjects } from '@/hooks/useProjects';
+import { useAllProjects } from '@/hooks/useProjects';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useCatalogs } from '@/hooks/useCatalogs';
+import { useAreas } from '@/hooks/useAreas';
+import useUsers from '@/hooks/useUsers';
 import { ROLES, TASK_STATUS, TASK_PRIORITY } from '@/constants';
 import { formatDate, formatDuration } from '@/utils';
 import TaskForm from './TaskForm';
@@ -52,7 +55,10 @@ const TasksView = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t } = useTranslation();
-  const { projects } = useProjects();
+  const { projects } = useAllProjects();
+  const { areas } = useAreas();
+  const { salesManagements, mentors, coordinators } = useCatalogs();
+  const { users, fetchAllUsers: loadAllUsers } = useUsers();
 
   const statusConfig = {
     [TASK_STATUS.TODO]: {
@@ -94,6 +100,18 @@ const TasksView = () => {
     projectId: '',
     assignedTo: '',
     dueDate: '',
+    // Filtros de proyectos
+    areaId: '',
+    projectStatus: '',
+    projectPriority: '',
+    // Filtros de asignaciones de proyectos
+    assignedUserId: '',
+    // Filtros de Excel
+    mentorId: '',
+    coordinatorId: '',
+    salesManagementId: '',
+    salesExecutiveId: '',
+    siebelOrderNumber: '',
   });
 
   const { tasks, loading, error, pagination, fetchTasks, deleteTask, updateTaskStatus } = useTasks();
@@ -111,10 +129,16 @@ const TasksView = () => {
   const [expandedProjects, setExpandedProjects] = useState(new Set());
   const [selectedTasks, setSelectedTasks] = useState(new Set());
   const [showBulkAssign, setShowBulkAssign] = useState(false);
+  const [showAllProjects, setShowAllProjects] = useState(false); // Toggle para mostrar todos los proyectos
 
   const isAdmin = user?.role === ROLES.ADMIN;
   const isManager = user?.role === ROLES.MANAGER;
   const canCreateTasks = isAdmin || isManager;
+
+  // Cargar todos los usuarios para filtros
+  useEffect(() => {
+    loadAllUsers();
+  }, [loadAllUsers]);
 
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value };
@@ -215,7 +239,8 @@ const TasksView = () => {
     return new Date(task.dueDate) < new Date() && task.status !== TASK_STATUS.DONE;
   };
 
-  const groupTasksByProject = (tasks) => {
+  const groupTasksByProject = (tasks, includeAllProjects = false) => {
+    // Primero agrupamos las tareas por proyecto
     const grouped = tasks.reduce((acc, task) => {
       const projectKey = task.project?.id || 'no-project';
 
@@ -229,6 +254,18 @@ const TasksView = () => {
       acc[projectKey].tasks.push(task);
       return acc;
     }, {});
+
+    // Si showAllProjects está activado, agregamos proyectos sin tareas
+    if (includeAllProjects && projects) {
+      projects.forEach(project => {
+        if (!grouped[project.id]) {
+          grouped[project.id] = {
+            project: project,
+            tasks: []
+          };
+        }
+      });
+    }
 
     return Object.values(grouped).sort((a, b) => {
       if (a.project.id === 'no-project') return 1;
@@ -296,6 +333,20 @@ const TasksView = () => {
             </button>
           </div>
 
+          {/* Show All Projects Toggle */}
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="showAllProjects"
+              checked={showAllProjects}
+              onChange={(e) => setShowAllProjects(e.target.checked)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="showAllProjects" className="text-sm font-medium text-gray-700">
+              Mostrar todos los proyectos
+            </label>
+          </div>
+
           {canCreateTasks && (
             <Button onClick={() => setShowForm(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -314,6 +365,7 @@ const TasksView = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Primera fila - Filtros básicos de tareas */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -378,6 +430,112 @@ const TasksView = () => {
               value={filters.dueDate}
               onChange={(e) => handleFilterChange('dueDate', e.target.value)}
             />
+          </div>
+
+          {/* Segunda fila - Filtros de proyectos */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mt-4">
+            <select
+              value={filters.areaId}
+              onChange={(e) => handleFilterChange('areaId', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Todas las Áreas</option>
+              {areas && areas.map((area) => (
+                <option key={area.id} value={area.id}>
+                  {area.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.projectStatus}
+              onChange={(e) => handleFilterChange('projectStatus', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Estados de Proyecto</option>
+              <option value="ACTIVE">{t('active')}</option>
+              <option value="COMPLETED">{t('completed')}</option>
+              <option value="ON_HOLD">{t('onHold')}</option>
+              <option value="CANCELLED">{t('cancelled')}</option>
+              <option value="AWARDED">Ganado</option>
+            </select>
+
+            <select
+              value={filters.assignedUserId}
+              onChange={(e) => handleFilterChange('assignedUserId', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Usuarios Asignados</option>
+              <option value="me">Mis Proyectos</option>
+              {users && users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.firstName} {user.lastName}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.mentorId}
+              onChange={(e) => handleFilterChange('mentorId', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Todos los Mentores</option>
+              {mentors && mentors.map((mentor) => (
+                <option key={mentor.id} value={mentor.id}>
+                  {mentor.firstName} {mentor.lastName}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.coordinatorId}
+              onChange={(e) => handleFilterChange('coordinatorId', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Todos los Coordinadores</option>
+              {coordinators && coordinators.map((coordinator) => (
+                <option key={coordinator.id} value={coordinator.id}>
+                  {coordinator.firstName} {coordinator.lastName}
+                </option>
+              ))}
+            </select>
+
+            <Input
+              placeholder="Orden Siebel..."
+              value={filters.siebelOrderNumber}
+              onChange={(e) => handleFilterChange('siebelOrderNumber', e.target.value)}
+            />
+          </div>
+
+          {/* Tercera fila - Botón de limpiar filtros */}
+          <div className="flex justify-end mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                const emptyFilters = {
+                  search: '',
+                  status: '',
+                  priority: '',
+                  projectId: '',
+                  assignedTo: '',
+                  dueDate: '',
+                  areaId: '',
+                  projectStatus: '',
+                  projectPriority: '',
+                  assignedUserId: '',
+                  mentorId: '',
+                  coordinatorId: '',
+                  salesManagementId: '',
+                  salesExecutiveId: '',
+                  siebelOrderNumber: '',
+                };
+                setFilters(emptyFilters);
+                fetchTasks({});
+              }}
+              className="whitespace-nowrap"
+            >
+              Limpiar Filtros
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -657,14 +815,14 @@ const TasksView = () => {
           {tasks.length > 0 && (
             <div className="flex justify-between items-center">
               <div className="text-sm text-gray-600">
-                {groupTasksByProject(tasks).length} project{groupTasksByProject(tasks).length !== 1 ? 's' : ''} found
+                {groupTasksByProject(tasks, showAllProjects).length} project{groupTasksByProject(tasks, showAllProjects).length !== 1 ? 's' : ''} found
               </div>
               <div className="flex space-x-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    const allProjects = groupTasksByProject(tasks).map(g => g.project.id);
+                    const allProjects = groupTasksByProject(tasks, showAllProjects).map(g => g.project.id);
                     setExpandedProjects(new Set(allProjects));
                   }}
                 >
@@ -680,7 +838,7 @@ const TasksView = () => {
               </div>
             </div>
           )}
-          {groupTasksByProject(tasks).map((group) => {
+          {groupTasksByProject(tasks, showAllProjects).map((group) => {
             const isExpanded = expandedProjects.has(group.project.id);
             const completedTasks = group.tasks.filter(t => t.status === TASK_STATUS.DONE).length;
             const overdueTasks = group.tasks.filter(t => isOverdue(t)).length;
@@ -721,40 +879,41 @@ const TasksView = () => {
                 </CardHeader>
                 {isExpanded && (
                   <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-8">
-                            <input
-                              type="checkbox"
-                              checked={group.tasks.length > 0 && group.tasks.every(task => selectedTasks.has(task.id))}
-                              onChange={() => {
-                                const allSelected = group.tasks.every(task => selectedTasks.has(task.id));
-                                const newSelected = new Set(selectedTasks);
-                                group.tasks.forEach(task => {
-                                  if (allSelected) {
-                                    newSelected.delete(task.id);
-                                  } else {
-                                    newSelected.add(task.id);
-                                  }
-                                });
-                                setSelectedTasks(newSelected);
-                              }}
-                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                            />
-                          </TableHead>
-                          <TableHead className="w-8"></TableHead>
-                          <TableHead>Task</TableHead>
-                          <TableHead className="w-24">Priority</TableHead>
-                          <TableHead className="w-24">Status</TableHead>
-                          <TableHead className="w-32">Assignee</TableHead>
-                          <TableHead className="w-24">Due Date</TableHead>
-                          <TableHead className="w-20">Progress</TableHead>
-                          <TableHead className="w-20">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {group.tasks.map((task) => {
+                    {group.tasks.length > 0 ? (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-8">
+                              <input
+                                type="checkbox"
+                                checked={group.tasks.length > 0 && group.tasks.every(task => selectedTasks.has(task.id))}
+                                onChange={() => {
+                                  const allSelected = group.tasks.every(task => selectedTasks.has(task.id));
+                                  const newSelected = new Set(selectedTasks);
+                                  group.tasks.forEach(task => {
+                                    if (allSelected) {
+                                      newSelected.delete(task.id);
+                                    } else {
+                                      newSelected.add(task.id);
+                                    }
+                                  });
+                                  setSelectedTasks(newSelected);
+                                }}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                              />
+                            </TableHead>
+                            <TableHead className="w-8"></TableHead>
+                            <TableHead>Task</TableHead>
+                            <TableHead className="w-24">Priority</TableHead>
+                            <TableHead className="w-24">Status</TableHead>
+                            <TableHead className="w-32">Assignee</TableHead>
+                            <TableHead className="w-24">Due Date</TableHead>
+                            <TableHead className="w-20">Progress</TableHead>
+                            <TableHead className="w-20">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {group.tasks.map((task) => {
                           const progress = calculateProgress(task);
                           const overdue = isOverdue(task);
 
@@ -904,9 +1063,32 @@ const TasksView = () => {
                               </TableCell>
                             </TableRow>
                           );
-                        })}
-                      </TableBody>
-                    </Table>
+                          })}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <div className="text-center py-8">
+                        <div className="text-gray-400 mb-2">
+                          <Clock className="h-8 w-8 mx-auto" />
+                        </div>
+                        <p className="text-sm text-gray-500">Este proyecto no tiene tareas</p>
+                        {canCreateTasks && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-3"
+                            onClick={() => {
+                              // Pre-seleccionar el proyecto en el formulario de tarea
+                              setFilters(prev => ({ ...prev, projectId: group.project.id }));
+                              setShowForm(true);
+                            }}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Agregar Tarea
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 )}
               </Card>
@@ -915,7 +1097,7 @@ const TasksView = () => {
         </div>
       )}
 
-      {tasks.length === 0 && !loading && (
+      {tasks.length === 0 && !loading && !showAllProjects && (
         <div className="text-center py-12">
           <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
             <Clock className="h-12 w-12 text-gray-400" />
@@ -927,12 +1109,28 @@ const TasksView = () => {
               : 'Get started by creating your first task.'
             }
           </p>
+          <p className="text-sm text-gray-500 mb-4">
+            Puedes activar "Mostrar todos los proyectos" para ver proyectos sin tareas.
+          </p>
           {canCreateTasks && (
             <Button onClick={() => setShowForm(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Create Task
             </Button>
           )}
+        </div>
+      )}
+
+      {/* Mensaje cuando showAllProjects está activo pero no hay proyectos */}
+      {tasks.length === 0 && !loading && showAllProjects && projects?.length === 0 && (
+        <div className="text-center py-12">
+          <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+            <Clock className="h-12 w-12 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No projects found</h3>
+          <p className="text-gray-600 mb-4">
+            No hay proyectos disponibles para mostrar.
+          </p>
         </div>
       )}
 

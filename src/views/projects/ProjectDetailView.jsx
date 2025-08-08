@@ -12,7 +12,8 @@ import {
   Circle,
   User,
   MapPin,
-  Edit
+  Edit,
+  FileText
 } from 'lucide-react';
 import { 
   Button, 
@@ -30,6 +31,8 @@ import { ROLES } from '@/constants';
 import { formatDate, formatDuration, getInitials } from '@/utils';
 import ProjectAssignments from './ProjectAssignments';
 import ProjectStatistics from './ProjectStatistics';
+import ProjectTasksList from '@/components/tasks/ProjectTasksList';
+import ProjectDetailsTab from '@/components/projects/ProjectDetailsTab';
 
 const statusConfig = {
   ACTIVE: { variant: 'success', label: 'Active' },
@@ -228,6 +231,7 @@ const ProjectDetailView = () => {
         <nav className="-mb-px flex space-x-8">
           {[
             { id: 'overview', label: 'Overview', icon: Circle },
+            { id: 'details', label: 'Details', icon: FileText },
             { id: 'tasks', label: 'Tasks', icon: CheckCircle },
             { id: 'team', label: 'Team', icon: Users },
             { id: 'timeline', label: 'Timeline', icon: Calendar },
@@ -334,56 +338,119 @@ const ProjectDetailView = () => {
           </div>
         )}
 
+        {activeTab === 'details' && (
+          <ProjectDetailsTab project={project} />
+        )}
+
         {activeTab === 'tasks' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Project Tasks</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <p className="text-gray-500">Task management will be implemented in the next phase.</p>
-                <p className="text-sm text-gray-400 mt-2">
-                  Currently showing {project._count?.tasks || 0} tasks for this project.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <ProjectTasksList projectId={project.id} canManage={canManageProject} />
         )}
 
         {activeTab === 'team' && (
           <Card>
             <CardHeader>
-              <CardTitle>Team Management</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center space-x-2">
+                  <Users className="h-5 w-5" />
+                  <span>Team Management</span>
+                </CardTitle>
+                {canManageProject && (
+                  <Button onClick={() => setShowAssignments(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Member
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {project.assignments?.map((assignment) => (
-                  <div key={assignment.user.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                        <span className="text-sm font-medium text-gray-600">
-                          {getInitials(`${assignment.user.firstName} ${assignment.user.lastName}`)}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {assignment.user.firstName} {assignment.user.lastName}
-                        </p>
-                        <p className="text-sm text-gray-500">{assignment.user.role}</p>
-                      </div>
+                {/* Excel Project Team (Mentor & Coordinator) */}
+                {(project.excelDetails?.mentor || project.excelDetails?.coordinator) && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-gray-900 mb-3">Project Leadership</h4>
+                    <div className="space-y-3">
+                      {project.excelDetails?.mentor && (
+                        <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">
+                          <div className="w-10 h-10 bg-blue-200 rounded-full flex items-center justify-center">
+                            <span className="text-sm font-medium text-blue-700">
+                              {getInitials(`${project.excelDetails.mentor.firstName} ${project.excelDetails.mentor.lastName}`)}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {project.excelDetails.mentor.firstName} {project.excelDetails.mentor.lastName}
+                            </p>
+                            <p className="text-sm text-blue-600">Mentor</p>
+                          </div>
+                        </div>
+                      )}
+                      {project.excelDetails?.coordinator && (
+                        <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg">
+                          <div className="w-10 h-10 bg-green-200 rounded-full flex items-center justify-center">
+                            <span className="text-sm font-medium text-green-700">
+                              {getInitials(`${project.excelDetails.coordinator.firstName} ${project.excelDetails.coordinator.lastName}`)}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {project.excelDetails.coordinator.firstName} {project.excelDetails.coordinator.lastName}
+                            </p>
+                            <p className="text-sm text-green-600">Coordinator</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    
+                  </div>
+                )}
+
+                {/* Regular Team Members */}
+                {project.assignments && project.assignments.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-3">Team Members ({project.assignments.length})</h4>
+                    <div className="space-y-3">
+                      {project.assignments.map((assignment) => (
+                        <div key={assignment.user.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                              <span className="text-sm font-medium text-gray-600">
+                                {getInitials(`${assignment.user.firstName} ${assignment.user.lastName}`)}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900">
+                                {assignment.user.firstName} {assignment.user.lastName}
+                              </p>
+                              <div className="flex items-center space-x-2">
+                                <p className="text-sm text-gray-500">{assignment.user.role}</p>
+                                <span className="text-gray-300">•</span>
+                                <p className="text-sm text-gray-500">
+                                  Assigned {formatDate(assignment.assignedAt)}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {canManageProject && (
+                            <Button variant="outline" size="sm">
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {(!project.assignments || project.assignments.length === 0) && !project.excelDetails?.mentor && !project.excelDetails?.coordinator && (
+                  <div className="text-center py-8">
+                    <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500 mb-2">No team members assigned to this project</p>
                     {canManageProject && (
-                      <Button variant="outline" size="sm">
-                        Remove
+                      <Button variant="outline" onClick={() => setShowAssignments(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Team Members
                       </Button>
                     )}
-                  </div>
-                ))}
-                
-                {project.assignments?.length === 0 && (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">No team members assigned to this project.</p>
                   </div>
                 )}
               </div>
