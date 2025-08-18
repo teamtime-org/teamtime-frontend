@@ -8,6 +8,7 @@ import {
   Users,
   Building,
   BarChart3,
+  Settings,
   X
 } from 'lucide-react';
 import { cn } from '@/utils';
@@ -48,7 +49,7 @@ const AppSidebar = ({ isOpen, onClose }) => {
 const SidebarContent = () => {
   const { user } = useAuth();
   const { t } = useTranslation();
-  const isAdmin = user?.role === ROLES.ADMIN;
+  const isAdmin = user?.role === ROLES.ADMIN || user?.role === ROLES.ADMINISTRADOR;
 
   const navigation = [
     { name: t('dashboard'), href: '/dashboard', icon: Home },
@@ -61,6 +62,7 @@ const SidebarContent = () => {
   const adminNavigation = [
     { name: t('users'), href: '/users', icon: Users },
     { name: t('areas'), href: '/areas', icon: Building },
+    { name: 'Configuración Sistema', href: '/admin/system-config', icon: Settings },
   ];
 
   return (

@@ -6,5 +6,8 @@ export { default as Badge } from './Badge';
 export { default as LanguageSelector } from './LanguageSelector';
 export { default as ProjectSearchSelect } from './ProjectSearchSelect';
 export { default as UserSearchSelect } from './UserSearchSelect';
+export { default as UserProfile } from './UserProfile';
+export { default as UserStats } from './UserStats';
+export { default as QuickActions } from './QuickActions';
 export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent } from './Card';
 export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell } from './Table';

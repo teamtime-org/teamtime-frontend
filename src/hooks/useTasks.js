@@ -38,6 +38,51 @@ export const useProjectTasks = (projectId) => {
   };
 };
 
+// Hook para cargar tareas de proyectos asignados al usuario actual (para timesheet)
+export const useAssignedTasks = (projectId = null) => {
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchAssignedTasks = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Las tareas vienen de proyectos asignados, no de asignaciones directas
+      // Usamos el parámetro assignedProjects en lugar de assigned
+      const params = { 
+        assignedProjects: true, // Flag para filtrar tareas de proyectos asignados
+        limit: 1000
+      };
+      
+      if (projectId) {
+        params.projectId = projectId;
+      }
+      
+      const response = await taskService.getAll(params);
+      setTasks(response.data?.tasks || []);
+    } catch (err) {
+      console.error('Error fetching assigned tasks:', err);
+      setError(err.response?.data?.message || 'Error loading assigned tasks');
+      setTasks([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    fetchAssignedTasks();
+  }, []); // Solo ejecutar una vez al montar
+
+  return {
+    tasks,
+    loading,
+    error,
+    refetch: fetchAssignedTasks,
+  };
+};
+
 export const useTasks = () => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);

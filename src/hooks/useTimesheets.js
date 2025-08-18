@@ -49,9 +49,10 @@ export const useTimesheets = (initialParams = {}) => {
       await fetchTimesheets();
       return response.data;
     } catch (err) {
-      console.warn('Timesheet creation API not available');
-      setError('Backend not available - Timesheet creation disabled');
-      throw new Error('Backend not available');
+      console.error('Error creating timesheet:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Error creating timesheet';
+      setError(errorMessage);
+      throw err; // Lanzar el error original para que el componente pueda manejarlo
     } finally {
       setLoading(false);
     }

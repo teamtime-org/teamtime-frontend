@@ -21,7 +21,10 @@ export const timesheetService = {
 
   // Create new time entry
   createTimeEntry: async (entryData) => {
+    console.log('[TimesheetService] Creating time entry with data:', entryData);
     const response = await api.post('/time-entries', entryData);
+    console.log('[TimesheetService] Time entry created successfully:', response.data);
+    console.log('[TimesheetService] Time entry data structure:', response.data.data);
     return response.data;
   },
 

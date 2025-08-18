@@ -36,7 +36,7 @@ import {
 import { useTimesheets, useTimer, useTimesheetApprovals } from '@/hooks/useTimesheets';
 import { useAuth } from '@/hooks/useAuth';
 import { ROLES, TIMESHEET_STATUS } from '@/constants';
-import { formatDate, formatDateTime, formatDuration } from '@/utils';
+import { formatDate, formatDateTime, formatDuration, getWeekRange, getWeekDays } from '@/utils';
 import TimesheetForm from './TimesheetForm';
 import WeeklyTimesheetView from './WeeklyTimesheetView';
 import TimesheetMatrix from './TimesheetMatrix';
@@ -101,28 +101,8 @@ const TimesheetView = () => {
     fetchTimesheets();
   }, [fetchTimesheets, currentDate]);
 
-  const getWeekStart = (date) => {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day;
-    return new Date(d.setDate(diff));
-  };
-
-  const getWeekEnd = (date) => {
-    const weekStart = getWeekStart(date);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-    return weekEnd;
-  };
-
-  const getWeekDays = (weekStart) => {
-    const days = [];
-    for (let i = 0; i < 7; i++) {
-      const day = new Date(weekStart);
-      day.setDate(day.getDate() + i);
-      days.push(day);
-    }
-    return days;
+  const getWeekStartAndEnd = (date) => {
+    return getWeekRange(date);
   };
 
   const navigateWeek = (direction) => {
@@ -187,18 +167,17 @@ const TimesheetView = () => {
   };
 
   const calculateWeeklyHours = (weekStart) => {
-    const weekEnd = getWeekEnd(weekStart);
+    const { start, end } = getWeekRange(weekStart);
     const weekTimesheets = timesheets.filter(timesheet => {
       const timesheetDate = new Date(timesheet.weekStart);
-      return timesheetDate >= weekStart && timesheetDate <= weekEnd;
+      return timesheetDate >= start && timesheetDate <= end;
     });
     
     return weekTimesheets.reduce((total, timesheet) => total + (timesheet.totalHours || 0), 0);
   };
 
-  const currentWeekStart = getWeekStart(currentDate);
-  const currentWeekEnd = getWeekEnd(currentDate);
-  const weekDays = getWeekDays(currentWeekStart);
+  const { start: currentWeekStart, end: currentWeekEnd } = getWeekRange(currentDate);
+  const weekDays = getWeekDays(currentDate);
 
   if (loading && timesheets.length === 0) {
     return (
@@ -250,7 +229,7 @@ const TimesheetView = () => {
               <div className="ml-3">
                 <div className="text-sm font-medium text-gray-600">This Week</div>
                 <div className="text-2xl font-bold text-gray-900">
-                  {formatDuration(calculateWeeklyHours(currentWeekStart))}
+                  {formatDuration(calculateWeeklyHours(currentDate))}
                 </div>
               </div>
             </div>

@@ -161,6 +161,45 @@ export const useAllProjects = () => {
   };
 };
 
+// Hook para cargar solo los proyectos asignados al usuario actual (para timesheet)
+export const useAssignedProjects = () => {
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchAssignedProjects = useCallback(async (params = {}) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Filtrar por proyectos asignados al usuario actual
+      const queryParams = { 
+        ...params, 
+        assigned: true, // Flag para filtrar por asignaciones
+        limit: 1000 
+      };
+      const response = await projectService.getAll(queryParams);
+
+      setProjects(response.data?.projects || []);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error loading assigned projects');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAssignedProjects();
+  }, []); // Solo ejecutar una vez al montar
+
+  return {
+    projects,
+    loading,
+    error,
+    fetchAssignedProjects,
+  };
+};
+
 export const useProject = (id) => {
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(false);
