@@ -51,6 +51,19 @@ const SidebarContent = () => {
   const { t } = useTranslation();
   const isAdmin = user?.role === ROLES.ADMIN || user?.role === ROLES.ADMINISTRADOR;
 
+  const getRoleDisplayName = (role) => {
+    switch (role) {
+      case ROLES.ADMIN:
+        return 'Administrador';
+      case ROLES.MANAGER:
+        return 'Gerente';
+      case ROLES.COLLABORATOR:
+        return 'Colaborador';
+      default:
+        return role || 'Usuario';
+    }
+  };
+
   const navigation = [
     { name: t('dashboard'), href: '/dashboard', icon: Home },
     { name: t('projects'), href: '/projects', icon: FolderOpen },
@@ -131,9 +144,31 @@ const SidebarContent = () => {
         </ul>
       </nav>
 
-      {/* Language Selector */}
-      <div className="mt-auto pb-4">
-        <LanguageSelector />
+      {/* User Info Section */}
+      <div className="mt-auto border-t border-gray-700 pt-4">
+        <div className="flex items-center px-2 py-3">
+          <img
+            className="h-10 w-10 rounded-full bg-gray-50"
+            src={user?.avatar || `https://ui-avatars.com/api/?name=${user?.firstName}+${user?.lastName}&background=3b82f6&color=fff`}
+            alt={`${user?.firstName} ${user?.lastName}`}
+          />
+          <div className="ml-3 flex-1">
+            <div className="text-sm font-medium text-white">
+              {user?.firstName} {user?.lastName}
+            </div>
+            <div className="text-xs text-gray-400">
+              {getRoleDisplayName(user?.role)}
+            </div>
+            <div className="text-xs text-gray-500">
+              {user?.email}
+            </div>
+          </div>
+        </div>
+        
+        {/* Language Selector */}
+        <div className="pt-3">
+          <LanguageSelector />
+        </div>
       </div>
     </div>
   );

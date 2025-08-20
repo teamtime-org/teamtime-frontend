@@ -1,18 +1,33 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Save } from 'lucide-react';
-import { Button, Card, CardContent, CardHeader, CardTitle, Loading } from '@/components/ui';
+import { ChevronLeft, ChevronRight, Save, Filter } from 'lucide-react';
+import { Button, Card, CardContent, CardHeader, CardTitle, Loading, Input } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { useAssignedTasks } from '@/hooks/useTasks';
-import { useAssignedProjects } from '@/hooks/useProjects';
+import { useAssignedProjects, useAllProjects } from '@/hooks/useProjects';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useAreas } from '@/hooks/useAreas';
+import { useCatalogs } from '@/hooks/useCatalogs';
+import useUsers from '@/hooks/useUsers';
 import { timesheetService } from '@/services/timesheetService';
 import { formatDate } from '@/utils';
+import { ROLES } from '@/constants';
 
 const TimesheetMatrix = () => {
   const { user, userId } = useAuth();
   const { t } = useTranslation();
-  const { projects, loading: projectsLoading } = useAssignedProjects();
+  
+  // Usar todos los proyectos para admins, solo asignados para usuarios normales
+  const isAdmin = user?.role === ROLES.ADMIN;
+  const { projects: assignedProjects, loading: assignedLoading } = useAssignedProjects();
+  const { projects: allProjects, loading: allLoading } = useAllProjects();
+  
+  const projects = isAdmin ? allProjects : assignedProjects;
+  const projectsLoading = isAdmin ? allLoading : assignedLoading;
+  
   const { tasks, loading: tasksLoading } = useAssignedTasks();
+  const { areas } = useAreas();
+  const { salesManagements, mentors, coordinators } = useCatalogs();
+  const { fetchAllUsers: loadAllUsers } = useUsers();
 
   const [weekStart, setWeekStart] = useState(() => {
     const today = new Date();
@@ -26,18 +41,126 @@ const TimesheetMatrix = () => {
   const [timeEntries, setTimeEntries] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saveIndicator, setSaveIndicator] = useState({});
-  const [projectStatusFilter, setProjectStatusFilter] = useState('ACTIVE');
+  const [filters, setFilters] = useState({
+    status: 'ACTIVE',
+    priority: '',
+    areaId: '',
+    coordinatorId: '',
+    mentorId: '',
+    salesManagementId: '',
+    siebelOrderNumber: '',
+  });
 
-  // Filtrar proyectos por estado
+  // Cargar todos los usuarios para el filtro
+  useEffect(() => {
+    loadAllUsers();
+  }, [loadAllUsers]);
+
+  // Función para aplicar filtros
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  // Limpiar todos los filtros
+  const clearAllFilters = () => {
+    setFilters({
+      status: 'ACTIVE',
+      priority: '',
+      areaId: '',
+      coordinatorId: '',
+      mentorId: '',
+      salesManagementId: '',
+      siebelOrderNumber: '',
+    });
+  };
+
+  // Obtener opciones de filtro basadas en los proyectos disponibles (para usuarios no-admin)
+  const getFilterOptions = useMemo(() => {
+    if (!projects || isAdmin) return null;
+    
+    const uniqueAreas = new Set();
+    const uniqueCoordinators = new Set();
+    const uniqueMentors = new Set();
+    const uniqueSalesManagements = new Set();
+    
+    projects.forEach(project => {
+      if (project.area) {
+        uniqueAreas.add(JSON.stringify({ id: project.area.id, name: project.area.name }));
+      }
+      if (project.excelDetails?.coordinator) {
+        uniqueCoordinators.add(JSON.stringify({
+          id: project.excelDetails.coordinator.id,
+          firstName: project.excelDetails.coordinator.firstName,
+          lastName: project.excelDetails.coordinator.lastName
+        }));
+      }
+      if (project.excelDetails?.mentor) {
+        uniqueMentors.add(JSON.stringify({
+          id: project.excelDetails.mentor.id,
+          firstName: project.excelDetails.mentor.firstName,
+          lastName: project.excelDetails.mentor.lastName
+        }));
+      }
+      if (project.excelDetails?.salesManagement) {
+        uniqueSalesManagements.add(JSON.stringify({
+          id: project.excelDetails.salesManagement.id,
+          name: project.excelDetails.salesManagement.name
+        }));
+      }
+    });
+    
+    return {
+      areas: Array.from(uniqueAreas).map(item => JSON.parse(item)),
+      coordinators: Array.from(uniqueCoordinators).map(item => JSON.parse(item)),
+      mentors: Array.from(uniqueMentors).map(item => JSON.parse(item)),
+      salesManagements: Array.from(uniqueSalesManagements).map(item => JSON.parse(item))
+    };
+  }, [projects, isAdmin]);
+
+  // Filtrar proyectos con todos los filtros aplicados
   const filteredProjects = useMemo(() => {
     if (!projects) return [];
     
-    if (projectStatusFilter === 'ALL') {
-      return projects;
-    }
-    
-    return projects.filter(project => project.status === projectStatusFilter);
-  }, [projects, projectStatusFilter]);
+    return projects.filter(project => {
+      // Filtro por estado
+      if (filters.status && filters.status !== 'ALL' && project.status !== filters.status) {
+        return false;
+      }
+      
+      // Filtro por prioridad
+      if (filters.priority && project.priority !== filters.priority) {
+        return false;
+      }
+      
+      // Filtro por área
+      if (filters.areaId && project.areaId !== filters.areaId) {
+        return false;
+      }
+      
+      // Filtro por coordinador
+      if (filters.coordinatorId && project.excelDetails?.coordinator?.id !== filters.coordinatorId) {
+        return false;
+      }
+      
+      // Filtro por mentor
+      if (filters.mentorId && project.excelDetails?.mentor?.id !== filters.mentorId) {
+        return false;
+      }
+      
+      // Filtro por gerencia de ventas
+      if (filters.salesManagementId && project.excelDetails?.salesManagement?.id !== filters.salesManagementId) {
+        return false;
+      }
+      
+      // Filtro por orden Siebel
+      if (filters.siebelOrderNumber && 
+          !project.excelDetails?.siebelOrderNumber?.toLowerCase().includes(filters.siebelOrderNumber.toLowerCase())) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [projects, filters]);
 
   // Generar array de días L-D (memoizado para evitar recálculos)
   const weekDays = useMemo(() => {
@@ -431,8 +554,8 @@ const TimesheetMatrix = () => {
           <div className="flex items-center gap-4">
             {/* Filtro de estado de proyectos */}
             <select
-              value={projectStatusFilter}
-              onChange={(e) => setProjectStatusFilter(e.target.value)}
+              value={filters.status}
+              onChange={(e) => handleFilterChange('status', e.target.value)}
               className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ACTIVE">Solo Activos</option>
@@ -459,9 +582,125 @@ const TimesheetMatrix = () => {
         
         {/* Información sobre proyectos cargados */}
         <div className="text-sm text-gray-600">
-          Mostrando {filteredProjects.length} proyecto(s) {projectStatusFilter === 'ALL' ? '' : projectStatusFilter.toLowerCase()} asignado(s)
+          Mostrando {filteredProjects.length} proyecto(s) {filters.status === 'ALL' ? '' : filters.status.toLowerCase()} 
+          {isAdmin ? ' (todos los proyectos del sistema)' : ' (asignados a ti)'}
         </div>
       </CardHeader>
+
+      {/* Filters Section */}
+      <Card className="mx-6 mb-4">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center">
+            <Filter className="h-5 w-5 mr-2" />
+            Filtros de Proyectos
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Estado */}
+            <select
+              value={filters.status}
+              onChange={(e) => handleFilterChange('status', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="ACTIVE">Solo Activos</option>
+              <option value="COMPLETED">Solo Completados</option>
+              <option value="ON_HOLD">Solo En Pausa</option>
+              <option value="CANCELLED">Solo Cancelados</option>
+              <option value="AWARDED">Solo Ganados</option>
+              <option value="ALL">Todos los Estados</option>
+            </select>
+
+            {/* Prioridad */}
+            <select
+              value={filters.priority}
+              onChange={(e) => handleFilterChange('priority', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Todas las Prioridades</option>
+              <option value="LOW">Baja</option>
+              <option value="MEDIUM">Media</option>
+              <option value="HIGH">Alta</option>
+              <option value="URGENT">Urgente</option>
+            </select>
+
+            {/* Área */}
+            <select
+              value={filters.areaId}
+              onChange={(e) => handleFilterChange('areaId', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">{isAdmin ? 'Todas las Áreas' : 'Áreas de mis proyectos'}</option>
+              {(isAdmin ? areas : getFilterOptions?.areas)?.map((area) => (
+                <option key={area.id} value={area.id}>
+                  {area.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Coordinador */}
+            <select
+              value={filters.coordinatorId}
+              onChange={(e) => handleFilterChange('coordinatorId', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">{isAdmin ? 'Todos los Coordinadores' : 'Coordinadores de mis proyectos'}</option>
+              {(isAdmin ? coordinators : getFilterOptions?.coordinators)?.map((coordinator) => (
+                <option key={coordinator.id} value={coordinator.id}>
+                  {coordinator.firstName} {coordinator.lastName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Segunda fila de filtros */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+            {/* Mentor */}
+            <select
+              value={filters.mentorId}
+              onChange={(e) => handleFilterChange('mentorId', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">{isAdmin ? 'Todos los Mentores' : 'Mentores de mis proyectos'}</option>
+              {(isAdmin ? mentors : getFilterOptions?.mentors)?.map((mentor) => (
+                <option key={mentor.id} value={mentor.id}>
+                  {mentor.firstName} {mentor.lastName}
+                </option>
+              ))}
+            </select>
+
+            {/* Gerencia de Ventas */}
+            <select
+              value={filters.salesManagementId}
+              onChange={(e) => handleFilterChange('salesManagementId', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">{isAdmin ? 'Todas las Gerencias' : 'Gerencias de mis proyectos'}</option>
+              {(isAdmin ? salesManagements : getFilterOptions?.salesManagements)?.map((management) => (
+                <option key={management.id} value={management.id}>
+                  {management.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Orden Siebel */}
+            <Input
+              placeholder="Orden Siebel..."
+              value={filters.siebelOrderNumber}
+              onChange={(e) => handleFilterChange('siebelOrderNumber', e.target.value)}
+            />
+
+            {/* Botón limpiar filtros */}
+            <Button
+              variant="outline"
+              onClick={clearAllFilters}
+              className="whitespace-nowrap"
+            >
+              Limpiar Filtros
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <CardContent>
         <div className="overflow-x-auto">
@@ -492,13 +731,15 @@ const TimesheetMatrix = () => {
                   <td colSpan={9} className="border border-gray-300 p-8 text-center">
                     <div className="text-gray-500">
                       <div className="text-lg font-medium mb-2">
-                        {projectStatusFilter === 'ACTIVE' ? 'Sin Proyectos Activos Asignados' : `Sin Proyectos ${projectStatusFilter} Asignados`}
+                        {filters.status === 'ACTIVE' 
+                          ? (isAdmin ? 'Sin Proyectos Activos en el Sistema' : 'Sin Proyectos Activos Asignados') 
+                          : `Sin Proyectos ${filters.status} ${isAdmin ? 'en el Sistema' : 'Asignados'}`}
                       </div>
                       <div className="text-sm">
-                        {projectStatusFilter === 'ACTIVE' 
-                          ? 'No tienes proyectos activos asignados. Contacta a tu coordinador o prueba con otro filtro de estado.' 
-                          : projects?.length > 0 
-                            ? 'No tienes proyectos en este estado. Cambia el filtro arriba para ver otros proyectos.'
+                        {projects?.length > 0 
+                          ? 'No hay proyectos que coincidan con los filtros seleccionados. Cambia los filtros arriba para ver otros proyectos.'
+                          : isAdmin 
+                            ? 'No hay proyectos en el sistema. Crea algunos proyectos para empezar a usarlos en el timesheet.'
                             : 'No tienes proyectos asignados. Contacta a tu coordinador para que te asigne proyectos.'
                         }
                       </div>
