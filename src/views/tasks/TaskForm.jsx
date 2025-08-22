@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Button, Input, ProjectSearchSelect, UserSearchSelect } from '@/components/ui';
+import { Info } from 'lucide-react';
+import { Button, Input, ProjectSearchSelect } from '@/components/ui';
 import { useTasks } from '@/hooks/useTasks';
 import { useAllProjects } from '@/hooks/useProjects';
-import { useAllUsers } from '../../hooks/useUsers';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
 import { ROLES, TASK_STATUS, TASK_PRIORITY } from '@/constants';
@@ -13,11 +13,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
   const { t } = useTranslation();
   const { createTask, updateTask, loading } = useTasks();
   const { projects = [] } = useAllProjects();
-  const { users } = useAllUsers();
   const [selectedProject, setSelectedProject] = useState(task?.projectId || '');
-  const [selectedAssignee, setSelectedAssignee] = useState(
-    task?.assignedTo?.id || task?.assignedToId || task?.assignee?.id || task?.assignedTo || ''
-  );
 
   const {
     register,
@@ -30,7 +26,6 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
       title: task?.title || '',
       description: task?.description || '',
       projectId: task?.projectId || '',
-      assignedToId: task?.assignedTo?.id || task?.assignedToId || '',
       status: task?.status || TASK_STATUS.TODO,
       priority: task?.priority || TASK_PRIORITY.MEDIUM,
       dueDate: task?.dueDate ? task.dueDate.split('T')[0] : '',
@@ -43,12 +38,10 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
 
   useEffect(() => {
     if (task) {
-      const assigneeId = task.assignedTo?.id || task.assignedToId || task.assignee?.id || task.assignedTo || '';
       reset({
         title: task.title,
         description: task.description,
         projectId: task.projectId,
-        assignedToId: assigneeId,
         status: task.status,
         priority: task.priority,
         dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
@@ -56,9 +49,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
         tags: task.tags ? task.tags.join(', ') : '',
       });
       setSelectedProject(task.projectId);
-      setSelectedAssignee(assigneeId);
       console.log('TaskForm loaded with task:', task);
-      console.log('Assigned to ID:', assigneeId);
     }
   }, [task]); // Solo depende de task, no de reset // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -68,7 +59,6 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
       console.log('User data:', user);
       console.log('Form data:', data);
       console.log('Selected project:', selectedProject);
-      console.log('Selected assignee:', selectedAssignee);
 
       // Verificar que el usuario esté autenticado y tenga un ID
       if (!user || !user.id) {
@@ -85,15 +75,11 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
       const taskData = {
         ...data,
         projectId: selectedProject,
-        assignedTo: selectedAssignee || null,
         createdBy: user.id, // Asegurar que se incluya el ID del usuario que crea la tarea
-        estimatedHours: parseInt(data.estimatedHours) || 0,
+        estimatedHours: data.estimatedHours ? parseInt(data.estimatedHours) : null,
         dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : null,
         tags: data.tags ? data.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
       };
-
-      // Remover assignedToId si existe en data para evitar conflictos
-      delete taskData.assignedToId;
 
       console.log('Task data to send:', taskData);
 
@@ -123,26 +109,17 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
   const handleProjectChange = (projectId) => {
     setSelectedProject(projectId);
     setValue('projectId', projectId);
-    // Reset assignee when project changes
-    setSelectedAssignee('');
-    setValue('assignedToId', '');
-  };
-
-  const handleAssigneeChange = (assigneeId) => {
-    setSelectedAssignee(assigneeId);
-    setValue('assignedToId', assigneeId);
   };
 
   const isAdmin = user?.role === ROLES.ADMIN;
+  const isCoordinator = user?.role === ROLES.MANAGER || user?.role === ROLES.COORDINADOR;
+  const canEditAllProjects = isAdmin || isCoordinator;
 
-  // Managers can only create tasks in their projects
-  const availableProjects = isAdmin
+  // Admins and coordinators can create tasks in any project, others only in their area projects
+  const availableProjects = canEditAllProjects
     ? projects
     : projects?.filter(project => project.areaId === user?.areaId);
 
-  // Get available assignees - por ahora usamos todos los usuarios
-  // TODO: Filtrar usuarios basado en las asignaciones del proyecto
-  const availableAssignees = users || [];
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-h-[70vh] overflow-y-auto">
@@ -202,15 +179,15 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {t('assignedTo')} <span className="text-gray-400 text-xs">(Opcional)</span>
-          </label>
-          <UserSearchSelect
-            users={availableAssignees || []}
-            value={selectedAssignee}
-            onChange={handleAssigneeChange}
-            placeholder={t('selectUser') || 'Buscar usuario...'}
-          />
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="flex items-center">
+              <Info className="h-4 w-4 text-blue-500 mr-2" />
+              <p className="text-sm text-blue-700">
+                <strong>Nota:</strong> Los usuarios se asignan al proyecto completo, no a tareas individuales.
+                Los colaboradores asignados al proyecto pueden trabajar en cualquier tarea.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div>
@@ -245,7 +222,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
 
         <div>
           <Input
-            label={t('estimatedHours')}
+            label={`${t('estimatedHours')} (Opcional)`}
             type="number"
             min="0"
             step="0.5"
@@ -254,7 +231,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
             {...register('estimatedHours', {
               min: {
                 value: 0,
-                message: t('estimatedHoursMin'),
+                message: 'Las horas estimadas no pueden ser negativas',
               },
               max: {
                 value: 1000,

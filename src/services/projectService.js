@@ -19,6 +19,7 @@ export const projectService = {
     if (params.salesManagementId) searchParams.append('salesManagementId', params.salesManagementId);
     if (params.salesExecutiveId) searchParams.append('salesExecutiveId', params.salesExecutiveId);
     if (params.siebelOrderNumber) searchParams.append('siebelOrderNumber', params.siebelOrderNumber);
+    if (params.isGeneral !== undefined) searchParams.append('isGeneral', params.isGeneral);
     
     const queryString = searchParams.toString();
     const response = await api.get(`/projects${queryString ? `?${queryString}` : ''}`);

@@ -27,7 +27,8 @@ import {
 } from '@/components/ui';
 import { useProject } from '@/hooks/useProjects';
 import { useAuth } from '@/hooks/useAuth';
-import { ROLES } from '@/constants';
+import { useStandardProjects } from '@/hooks/useStandardProjects';
+import { ROLES, STANDARD_PROJECT_TASKS } from '@/constants';
 import { formatDate, formatDuration, getInitials } from '@/utils';
 import ProjectAssignments from './ProjectAssignments';
 import ProjectStatistics from './ProjectStatistics';
@@ -53,14 +54,48 @@ const ProjectDetailView = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { project, loading, error } = useProject(id);
+  const { 
+    createStandardTasks, 
+    hasStandardTasks, 
+    loading: standardLoading 
+  } = useStandardProjects();
   
   const [activeTab, setActiveTab] = useState('overview');
   const [showAssignments, setShowAssignments] = useState(false);
   const [showStatistics, setShowStatistics] = useState(false);
+  const [hasStandardTasksChecked, setHasStandardTasksChecked] = useState(false);
+  const [needsStandardTasks, setNeedsStandardTasks] = useState(false);
 
   const isAdmin = user?.role === ROLES.ADMIN;
   const isManager = user?.role === ROLES.MANAGER;
   const canManageProject = isAdmin || (isManager && user?.areaId === project?.areaId);
+
+  // Verificar si el proyecto necesita tareas estándar
+  useEffect(() => {
+    if (project?.id && !hasStandardTasksChecked) {
+      hasStandardTasks(project.id)
+        .then((response) => {
+          setNeedsStandardTasks(!response.data.hasStandardTasks);
+          setHasStandardTasksChecked(true);
+        })
+        .catch((error) => {
+          console.error('Error checking standard tasks:', error);
+          setHasStandardTasksChecked(true);
+        });
+    }
+  }, [project?.id, hasStandardTasksChecked, hasStandardTasks]);
+
+  const handleCreateStandardTasks = async () => {
+    try {
+      await createStandardTasks(project.id);
+      setNeedsStandardTasks(false);
+      // Aquí podrías refrescar las tareas del proyecto si es necesario
+      alert('Tareas estándar creadas exitosamente');
+    } catch (error) {
+      console.error('Error creating standard tasks:', error);
+      alert('Error al crear las tareas estándar');
+    }
+  };
 
   if (loading) {
     return (
@@ -135,6 +170,17 @@ const ProjectDetailView = () => {
               <BarChart3 className="h-4 w-4 mr-2" />
               Statistics
             </Button>
+            {needsStandardTasks && (
+              <Button
+                variant="outline"
+                onClick={handleCreateStandardTasks}
+                disabled={standardLoading}
+                className="border-blue-500 text-blue-600 hover:bg-blue-50"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {standardLoading ? 'Creando...' : 'Crear Tareas Estándar'}
+              </Button>
+            )}
             <Button>
               <Edit className="h-4 w-4 mr-2" />
               Edit Project
@@ -142,6 +188,35 @@ const ProjectDetailView = () => {
           </div>
         )}
       </div>
+
+      {/* Alerta para tareas estándar */}
+      {needsStandardTasks && canManageProject && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <CheckCircle className="h-5 w-5 text-blue-500 mr-3" />
+                <div>
+                  <h4 className="font-medium text-blue-900">Tareas Estándar Faltantes</h4>
+                  <p className="text-sm text-blue-700">
+                    Este proyecto no tiene las 5 tareas estándar ({STANDARD_PROJECT_TASKS.join(', ')}). 
+                    Se recomienda crearlas para seguir la metodología estándar.
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                onClick={handleCreateStandardTasks}
+                disabled={standardLoading}
+                className="ml-4"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                {standardLoading ? 'Creando...' : 'Crear Ahora'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Project Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

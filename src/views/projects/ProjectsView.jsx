@@ -72,22 +72,25 @@ const ProjectsView = () => {
     salesManagementId: '',
     salesExecutiveId: '',
     siebelOrderNumber: '',
+    isGeneral: '',
   });
 
   const [viewMode, setViewMode] = useState('table'); // 'table' o 'cards'
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
 
+  const isAdmin = user?.role === ROLES.ADMIN;
+  const isCoordinator = user?.role === ROLES.MANAGER || user?.role === ROLES.COORDINADOR;
+  const isCollaborator = user?.role === ROLES.COLABORADOR;
+
+  // Usar un solo hook para todos los usuarios - el backend maneja la visibilidad por rol
   const { projects, loading, error, pagination, fetchProjects, deleteProject } = useProjects();
 
   const [showForm, setShowForm] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState(null);
-
-  const isAdmin = user?.role === ROLES.ADMIN;
-  const isManager = user?.role === ROLES.MANAGER;
-  const canCreateProjects = isAdmin || isManager;
+  const canCreateProjects = isAdmin || isCoordinator;
 
   // Cargar todos los usuarios para el filtro
   useEffect(() => {
@@ -117,6 +120,7 @@ const ProjectsView = () => {
       coordinatorId: '',
       salesManagementId: '',
       salesExecutiveId: '',
+      isGeneral: '',
       siebelOrderNumber: '',
     };
     setFilters(emptyFilters);
@@ -244,7 +248,7 @@ const ProjectsView = () => {
               onChange={(e) => handleFilterChange('status', e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="">Todos los Estados</option>
+              <option value="">Todos los Status</option>
               <option value="ACTIVE">{t('active')}</option>
               <option value="COMPLETED">{t('completed')}</option>
               <option value="ON_HOLD">{t('onHold')}</option>
@@ -264,6 +268,7 @@ const ProjectsView = () => {
               <option value="URGENT">{t('urgent')}</option>
             </select>
 
+{(isAdmin || isCoordinator) ? (
             <select
               value={filters.areaId}
               onChange={(e) => handleFilterChange('areaId', e.target.value)}
@@ -276,10 +281,25 @@ const ProjectsView = () => {
                 </option>
               ))}
             </select>
+            ) : (
+            <select
+              value={filters.areaId}
+              onChange={(e) => handleFilterChange('areaId', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Mi Área</option>
+              {areas && areas.filter(area => area.id === user?.areaId).map((area) => (
+                <option key={area.id} value={area.id}>
+                  {area.name}
+                </option>
+              ))}
+            </select>
+            )}
           </div>
 
-          {/* Segunda fila de filtros - Asignaciones y Excel Details */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mt-4">
+          {/* Segunda fila de filtros - Solo para administradores y coordinadores */}
+          {!isCollaborator && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4 mt-4">
             <select
               value={filters.assignedUserId}
               onChange={(e) => handleFilterChange('assignedUserId', e.target.value)}
@@ -339,6 +359,16 @@ const ProjectsView = () => {
               onChange={(e) => handleFilterChange('siebelOrderNumber', e.target.value)}
             />
 
+            <select
+              value={filters.isGeneral}
+              onChange={(e) => handleFilterChange('isGeneral', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Todos los Tipos</option>
+              <option value="true">Solo Generales</option>
+              <option value="false">Solo Específicos</option>
+            </select>
+
             <Button
               variant="outline"
               onClick={clearAllFilters}
@@ -347,6 +377,56 @@ const ProjectsView = () => {
               Limpiar Filtros
             </Button>
           </div>
+          )}
+
+          {/* Fila de filtros para colaboradores - Filtros de sus proyectos */}
+          {isCollaborator && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
+            <select
+              value={filters.coordinatorId}
+              onChange={(e) => handleFilterChange('coordinatorId', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Todos los Coordinadores</option>
+              {coordinators && coordinators.map((coordinator) => (
+                <option key={coordinator.id} value={coordinator.id}>
+                  {coordinator.firstName} {coordinator.lastName}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.salesManagementId}
+              onChange={(e) => handleFilterChange('salesManagementId', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Todas las Gerencias</option>
+              {salesManagements && salesManagements.map((management) => (
+                <option key={management.id} value={management.id}>
+                  {management.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.isGeneral}
+              onChange={(e) => handleFilterChange('isGeneral', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Todos los Tipos</option>
+              <option value="true">Solo Generales</option>
+              <option value="false">Solo Específicos</option>
+            </select>
+
+            <Button
+              variant="outline"
+              onClick={clearAllFilters}
+              className="whitespace-nowrap"
+            >
+              Limpiar Filtros
+            </Button>
+          </div>
+          )}
         </CardContent>
       </Card>
 

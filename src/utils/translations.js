@@ -74,6 +74,8 @@ export const translations = {
         endDateAfterStart: 'La fecha de fin debe ser posterior a la fecha de inicio',
         estimatedHoursMin: 'Las horas estimadas deben ser al menos 1',
         estimatedHoursMax: 'Las horas estimadas no deben exceder 10,000',
+        isGeneralProject: 'Proyecto General',
+        isGeneralProjectDescription: 'Los proyectos generales son visibles para todos los usuarios del área para registrar tiempo',
         save: 'Guardar',
         cancel: 'Cancelar',
         edit: 'Editar',

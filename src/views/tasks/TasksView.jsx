@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -39,8 +39,9 @@ import {
   TableRow,
   TableCell
 } from '@/components/ui';
-import { useTasks } from '@/hooks/useTasks';
-import { useAllProjects } from '@/hooks/useProjects';
+import { useTasks, useProjectTasks } from '@/hooks/useTasks';
+import { taskService } from '@/services/taskService';
+import { useProjects } from '@/hooks/useProjects';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useCatalogs } from '@/hooks/useCatalogs';
@@ -55,10 +56,27 @@ const TasksView = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t } = useTranslation();
-  const { projects } = useAllProjects();
+
+  const isAdmin = user?.role === ROLES.ADMIN;
+  const isCoordinator = user?.role === ROLES.MANAGER || user?.role === ROLES.COORDINADOR;
+  const isCollaborator = user?.role === ROLES.COLABORADOR;
+
+  // Usar un solo hook para proyectos - el backend maneja la visibilidad por rol
+  const { projects, loading: projectsLoading, fetchProjects, pagination: projectsPagination } = useProjects();
   const { areas } = useAreas();
   const { salesManagements, mentors, coordinators } = useCatalogs();
   const { users, fetchAllUsers: loadAllUsers } = useUsers();
+
+  // Estado para tareas agrupadas por proyecto
+  const [projectTasks, setProjectTasks] = useState({});
+  const [loadingTasks, setLoadingTasks] = useState(false);
+  const [error, setError] = useState(null);
+  const [totalTasksCount, setTotalTasksCount] = useState(0);
+
+  // Helper para obtener todas las tareas de todos los proyectos
+  const getAllTasks = () => {
+    return Object.values(projectTasks).flat();
+  };
 
   const statusConfig = {
     [TASK_STATUS.TODO]: {
@@ -97,29 +115,98 @@ const TasksView = () => {
     search: '',
     status: '',
     priority: '',
+    areaId: '',
+    // Filtros específicos de tareas
     projectId: '',
     assignedTo: '',
     dueDate: '',
-    // Filtros de proyectos
-    areaId: '',
-    projectStatus: '',
-    projectPriority: '',
-    // Filtros de asignaciones de proyectos
-    assignedUserId: '',
-    // Filtros de Excel
+    // Filtros de asignaciones reales (igual que proyectos)
+    assignedUserId: '', // Para usuarios asignados al proyecto
+    // Filtros de Excel (mantener para compatibilidad)
     mentorId: '',
     coordinatorId: '',
     salesManagementId: '',
     salesExecutiveId: '',
     siebelOrderNumber: '',
+    isGeneral: '',
   });
 
-  const { tasks, loading, error, pagination, fetchTasks, deleteTask, updateTaskStatus } = useTasks();
+  // Hook para operaciones de tareas
+  const { deleteTask, updateTaskStatus } = useTasks();
 
-  // Fetch tasks when filters change
+  // Función para obtener el conteo total de tareas de todos los proyectos filtrados
+  const loadTotalTasksCount = useCallback(async () => {
+    try {
+      // Primero obtenemos todos los proyectos con los filtros (sin paginación)
+      const allProjectsResponse = await fetchProjects({ ...filters, limit: 1000 });
+      
+      if (allProjectsResponse?.data?.projects) {
+        // Contamos las tareas de todos los proyectos
+        const tasksCountPromises = allProjectsResponse.data.projects.map(async (project) => {
+          const response = await taskService.getAll({ projectId: project.id, limit: 1 });
+          return response.data?.total || 0;
+        });
+
+        const tasksCounts = await Promise.all(tasksCountPromises);
+        const total = tasksCounts.reduce((sum, count) => sum + count, 0);
+        setTotalTasksCount(total);
+      }
+    } catch (err) {
+      console.error('Error loading total tasks count:', err);
+      setTotalTasksCount(0);
+    }
+  }, [filters, fetchProjects]);
+
+  // Función para cargar tareas de proyectos filtrados
+  const loadProjectTasks = useCallback(async () => {
+    if (!projects || projects.length === 0) {
+      setProjectTasks({});
+      setError(null);
+      return;
+    }
+
+    setLoadingTasks(true);
+    setError(null);
+    try {
+      const tasksPromises = projects.map(async (project) => {
+        const response = await taskService.getAll({ projectId: project.id });
+        return {
+          projectId: project.id,
+          tasks: response.data?.tasks || []
+        };
+      });
+
+      const results = await Promise.all(tasksPromises);
+      const tasksMap = {};
+      results.forEach(({ projectId, tasks }) => {
+        tasksMap[projectId] = tasks;
+      });
+      
+      setProjectTasks(tasksMap);
+    } catch (err) {
+      console.error('Error loading project tasks:', err);
+      setError(err.message || 'Error loading tasks');
+      setProjectTasks({});
+    } finally {
+      setLoadingTasks(false);
+    }
+  }, [projects]);
+
+  // Cargar tareas cuando cambien los proyectos
   useEffect(() => {
-    fetchTasks(filters);
-  }, [filters, fetchTasks]);
+    loadProjectTasks();
+  }, [loadProjectTasks]);
+
+  // Fetch projects when filters change
+  useEffect(() => {
+    const paginatedFilters = { 
+      ...filters, 
+      page: projectsPagination?.page || 1, 
+      limit: projectsPagination?.limit || 10 
+    };
+    fetchProjects(paginatedFilters);
+    loadTotalTasksCount(); // Cargar conteo total independientemente de la paginación
+  }, [filters, projectsPagination?.page, projectsPagination?.limit, fetchProjects, loadTotalTasksCount]);
 
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
@@ -131,7 +218,6 @@ const TasksView = () => {
   const [showBulkAssign, setShowBulkAssign] = useState(false);
   const [showAllProjects, setShowAllProjects] = useState(false); // Toggle para mostrar todos los proyectos
 
-  const isAdmin = user?.role === ROLES.ADMIN;
   const isManager = user?.role === ROLES.MANAGER;
   const canCreateTasks = isAdmin || isManager;
 
@@ -144,7 +230,7 @@ const TasksView = () => {
     const newFilters = { ...filters, [key]: value };
     console.log('Aplicando filtros:', newFilters);
     setFilters(newFilters);
-    // fetchTasks se llamará automáticamente por el useEffect
+    // fetchProjects se llamará automáticamente por el useEffect, y luego loadProjectTasks
   };
 
   const handleEdit = (task) => {
@@ -176,7 +262,7 @@ const TasksView = () => {
     setShowForm(false);
     setEditingTask(null);
     // Refrescar los datos después de una actualización exitosa
-    await fetchTasks(filters);
+    await loadProjectTasks();
   };
 
   const handleStatusChange = async (taskId, newStatus) => {
@@ -219,7 +305,7 @@ const TasksView = () => {
   const handleBulkAssignSuccess = async () => {
     setSelectedTasks(new Set());
     setShowBulkAssign(false);
-    await fetchTasks(filters);
+    await loadProjectTasks();
   };
 
   const calculateProgress = (task) => {
@@ -239,39 +325,20 @@ const TasksView = () => {
     return new Date(task.dueDate) < new Date() && task.status !== TASK_STATUS.DONE;
   };
 
-  const groupTasksByProject = (tasks, includeAllProjects = false) => {
-    // Primero agrupamos las tareas por proyecto
-    const grouped = tasks.reduce((acc, task) => {
-      const projectKey = task.project?.id || 'no-project';
+  const groupTasksByProject = (includeAllProjects = false) => {
+    // Ya tenemos las tareas agrupadas por proyecto en projectTasks
+    // Solo necesitamos convertirlo al formato esperado
+    const grouped = projects.map(project => ({
+      project,
+      tasks: projectTasks[project.id] || []
+    }));
 
-      if (!acc[projectKey]) {
-        acc[projectKey] = {
-          project: task.project || { name: 'No Project', id: 'no-project' },
-          tasks: []
-        };
-      }
-
-      acc[projectKey].tasks.push(task);
-      return acc;
-    }, {});
-
-    // Si showAllProjects está activado, agregamos proyectos sin tareas
-    if (includeAllProjects && projects) {
-      projects.forEach(project => {
-        if (!grouped[project.id]) {
-          grouped[project.id] = {
-            project: project,
-            tasks: []
-          };
-        }
-      });
+    // Si includeAllProjects es false, filtramos solo proyectos con tareas
+    if (!includeAllProjects) {
+      return grouped.filter(group => group.tasks.length > 0);
     }
 
-    return Object.values(grouped).sort((a, b) => {
-      if (a.project.id === 'no-project') return 1;
-      if (b.project.id === 'no-project') return -1;
-      return a.project.name.localeCompare(b.project.name);
-    });
+    return grouped.sort((a, b) => a.project.name.localeCompare(b.project.name));
   };
 
   const toggleProjectExpansion = (projectId) => {
@@ -284,7 +351,7 @@ const TasksView = () => {
     setExpandedProjects(newExpanded);
   };
 
-  if (loading && tasks.length === 0) {
+  if ((projectsLoading || loadingTasks) && getAllTasks().length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loading size="lg" />
@@ -365,12 +432,12 @@ const TasksView = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Primera fila - Filtros básicos de tareas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          {/* Primera fila - Filtros básicos */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                placeholder={t('searchTasks')}
+                placeholder="Buscar tareas..."
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
                 className="pl-10"
@@ -382,11 +449,12 @@ const TasksView = () => {
               onChange={(e) => handleFilterChange('status', e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="">{t('allStatus')}</option>
-              <option value={TASK_STATUS.TODO}>{t('todo')}</option>
-              <option value={TASK_STATUS.IN_PROGRESS}>{t('inProgress')}</option>
-              <option value={TASK_STATUS.REVIEW}>{t('inReview')}</option>
-              <option value={TASK_STATUS.DONE}>{t('done')}</option>
+              <option value="">Todos los Status</option>
+              <option value="ACTIVE">{t('active')}</option>
+              <option value="COMPLETED">{t('completed')}</option>
+              <option value="ON_HOLD">{t('onHold')}</option>
+              <option value="CANCELLED">{t('cancelled')}</option>
+              <option value="AWARDED">Ganado</option>
             </select>
 
             <select
@@ -394,46 +462,14 @@ const TasksView = () => {
               onChange={(e) => handleFilterChange('priority', e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="">{t('allPriorities')}</option>
+              <option value="">Todas las Prioridades</option>
               <option value={TASK_PRIORITY.LOW}>{t('low')}</option>
               <option value={TASK_PRIORITY.MEDIUM}>{t('medium')}</option>
               <option value={TASK_PRIORITY.HIGH}>{t('high')}</option>
               <option value={TASK_PRIORITY.URGENT}>{t('urgent')}</option>
             </select>
 
-            <select
-              value={filters.projectId}
-              onChange={(e) => handleFilterChange('projectId', e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="">{t('allProjects')}</option>
-              {projects && projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filters.assignedTo}
-              onChange={(e) => handleFilterChange('assignedTo', e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="">{t('allAssignees')}</option>
-              <option value="me">{t('myTasks')}</option>
-              <option value="unassigned">{t('unassigned')}</option>
-            </select>
-
-            <Input
-              type="date"
-              placeholder="Due date"
-              value={filters.dueDate}
-              onChange={(e) => handleFilterChange('dueDate', e.target.value)}
-            />
-          </div>
-
-          {/* Segunda fila - Filtros de proyectos */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mt-4">
+{(isAdmin || isCoordinator) ? (
             <select
               value={filters.areaId}
               onChange={(e) => handleFilterChange('areaId', e.target.value)}
@@ -446,20 +482,58 @@ const TasksView = () => {
                 </option>
               ))}
             </select>
-
+            ) : (
             <select
-              value={filters.projectStatus}
-              onChange={(e) => handleFilterChange('projectStatus', e.target.value)}
+              value={filters.areaId}
+              onChange={(e) => handleFilterChange('areaId', e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="">Estados de Proyecto</option>
-              <option value="ACTIVE">{t('active')}</option>
-              <option value="COMPLETED">{t('completed')}</option>
-              <option value="ON_HOLD">{t('onHold')}</option>
-              <option value="CANCELLED">{t('cancelled')}</option>
-              <option value="AWARDED">Ganado</option>
+              <option value="">Mi Área</option>
+              {areas && areas.filter(area => area.id === user?.areaId).map((area) => (
+                <option key={area.id} value={area.id}>
+                  {area.name}
+                </option>
+              ))}
+            </select>
+            )}
+          </div>
+
+          {/* Segunda fila - Filtros específicos de tareas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+            <select
+              value={filters.projectId}
+              onChange={(e) => handleFilterChange('projectId', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Todos los Proyectos</option>
+              {projects && projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
             </select>
 
+            <select
+              value={filters.assignedTo}
+              onChange={(e) => handleFilterChange('assignedTo', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Todos los Asignados</option>
+              <option value="me">Mis Tareas</option>
+              <option value="unassigned">Sin Asignar</option>
+            </select>
+
+            <Input
+              type="date"
+              placeholder="Fecha límite"
+              value={filters.dueDate}
+              onChange={(e) => handleFilterChange('dueDate', e.target.value)}
+            />
+          </div>
+
+          {/* Tercera fila - Filtros por rol - Solo para administradores y coordinadores */}
+          {(isAdmin || isCoordinator) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4 mt-4">
             <select
               value={filters.assignedUserId}
               onChange={(e) => handleFilterChange('assignedUserId', e.target.value)}
@@ -500,15 +574,35 @@ const TasksView = () => {
               ))}
             </select>
 
+            <select
+              value={filters.salesManagementId}
+              onChange={(e) => handleFilterChange('salesManagementId', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Todas las Gerencias</option>
+              {salesManagements && salesManagements.map((management) => (
+                <option key={management.id} value={management.id}>
+                  {management.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.isGeneral}
+              onChange={(e) => handleFilterChange('isGeneral', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Todos los Tipos</option>
+              <option value="true">Solo Generales</option>
+              <option value="false">Solo Específicos</option>
+            </select>
+
             <Input
               placeholder="Orden Siebel..."
               value={filters.siebelOrderNumber}
               onChange={(e) => handleFilterChange('siebelOrderNumber', e.target.value)}
             />
-          </div>
 
-          {/* Tercera fila - Botón de limpiar filtros */}
-          <div className="flex justify-end mt-4">
             <Button
               variant="outline"
               onClick={() => {
@@ -516,27 +610,96 @@ const TasksView = () => {
                   search: '',
                   status: '',
                   priority: '',
+                  areaId: '',
                   projectId: '',
                   assignedTo: '',
                   dueDate: '',
-                  areaId: '',
-                  projectStatus: '',
-                  projectPriority: '',
                   assignedUserId: '',
                   mentorId: '',
                   coordinatorId: '',
                   salesManagementId: '',
                   salesExecutiveId: '',
                   siebelOrderNumber: '',
+                  isGeneral: '',
                 };
                 setFilters(emptyFilters);
-                fetchTasks({});
+                // Los filtros se aplicarán automáticamente por useEffect
               }}
               className="whitespace-nowrap"
             >
               Limpiar Filtros
             </Button>
           </div>
+          )}
+
+          {/* Cuarta fila - Filtros para colaboradores - Solo filtros de sus proyectos */}
+          {isCollaborator && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
+            <select
+              value={filters.coordinatorId}
+              onChange={(e) => handleFilterChange('coordinatorId', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Todos los Coordinadores</option>
+              {coordinators && coordinators.map((coordinator) => (
+                <option key={coordinator.id} value={coordinator.id}>
+                  {coordinator.firstName} {coordinator.lastName}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.salesManagementId}
+              onChange={(e) => handleFilterChange('salesManagementId', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Todas las Gerencias</option>
+              {salesManagements && salesManagements.map((management) => (
+                <option key={management.id} value={management.id}>
+                  {management.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.isGeneral}
+              onChange={(e) => handleFilterChange('isGeneral', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Todos los Tipos</option>
+              <option value="true">Solo Generales</option>
+              <option value="false">Solo Específicos</option>
+            </select>
+
+            <Button
+              variant="outline"
+              onClick={() => {
+                const emptyFilters = {
+                  search: '',
+                  status: '',
+                  priority: '',
+                  areaId: '',
+                  projectId: '',
+                  assignedTo: '',
+                  dueDate: '',
+                  assignedUserId: '',
+                  mentorId: '',
+                  coordinatorId: '',
+                  salesManagementId: '',
+                  salesExecutiveId: '',
+                  siebelOrderNumber: '',
+                  isGeneral: '',
+                };
+                setFilters(emptyFilters);
+                // Los filtros se aplicarán automáticamente por useEffect
+              }}
+              className="whitespace-nowrap"
+            >
+              Limpiar Filtros
+            </Button>
+          </div>
+          )}
+
         </CardContent>
       </Card>
 
@@ -591,11 +754,22 @@ const TasksView = () => {
         </div>
       )}
 
-      {/* Tasks Grid */}
+      {/* Tasks Grid - Grouped by Projects */}
       {viewMode === 'grid' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {console.log('Tasks loaded:', tasks, 'Count:', tasks?.length)}
-          {tasks.map((task) => {
+        <div className="space-y-6">
+          {console.log('Projects loaded:', projects, 'Project tasks:', projectTasks)}
+          {projects.map((project) => {
+            const tasks = projectTasks[project.id] || [];
+            if (tasks.length === 0) return null;
+            
+            return (
+              <div key={project.id} className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900">{project.name}</h3>
+                  <Badge variant="outline">{tasks.length} tarea{tasks.length !== 1 ? 's' : ''}</Badge>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {tasks.map((task) => {
             const progress = calculateProgress(task);
             const overdue = isOverdue(task);
 
@@ -772,34 +946,38 @@ const TasksView = () => {
                 </CardContent>
               </Card>
             );
+                  })}
+                </div>
+              </div>
+            );
           })}
         </div>
       )}
 
       {/* Tasks Summary */}
-      {viewMode === 'list' && tasks.length > 0 && (
+      {viewMode === 'list' && totalTasksCount > 0 && (
         <Card>
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
               <div>
-                <div className="text-2xl font-bold text-blue-600">{tasks.length}</div>
-                <div className="text-sm text-gray-600">Total Tasks</div>
+                <div className="text-2xl font-bold text-blue-600">{totalTasksCount}</div>
+                <div className="text-sm text-gray-600">Total Tasks (All Pages)</div>
               </div>
               <div>
                 <div className="text-2xl font-bold text-green-600">
-                  {tasks.filter(t => t.status === TASK_STATUS.DONE).length}
+                  {getAllTasks().filter(t => t.status === TASK_STATUS.DONE).length}
                 </div>
                 <div className="text-sm text-gray-600">Completed</div>
               </div>
               <div>
                 <div className="text-2xl font-bold text-yellow-600">
-                  {tasks.filter(t => t.status === TASK_STATUS.IN_PROGRESS).length}
+                  {getAllTasks().filter(t => t.status === TASK_STATUS.IN_PROGRESS).length}
                 </div>
                 <div className="text-sm text-gray-600">In Progress</div>
               </div>
               <div>
                 <div className="text-2xl font-bold text-red-600">
-                  {tasks.filter(t => isOverdue(t)).length}
+                  {getAllTasks().filter(t => isOverdue(t)).length}
                 </div>
                 <div className="text-sm text-gray-600">Overdue</div>
               </div>
@@ -812,17 +990,17 @@ const TasksView = () => {
       {viewMode === 'list' && (
         <div className="space-y-6">
           {/* List Controls */}
-          {tasks.length > 0 && (
+          {totalTasksCount > 0 && (
             <div className="flex justify-between items-center">
               <div className="text-sm text-gray-600">
-                {groupTasksByProject(tasks, showAllProjects).length} project{groupTasksByProject(tasks, showAllProjects).length !== 1 ? 's' : ''} found
+                {groupTasksByProject(showAllProjects).length} project{groupTasksByProject(showAllProjects).length !== 1 ? 's' : ''} found
               </div>
               <div className="flex space-x-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    const allProjects = groupTasksByProject(tasks, showAllProjects).map(g => g.project.id);
+                    const allProjects = groupTasksByProject(showAllProjects).map(g => g.project.id);
                     setExpandedProjects(new Set(allProjects));
                   }}
                 >
@@ -838,7 +1016,7 @@ const TasksView = () => {
               </div>
             </div>
           )}
-          {groupTasksByProject(tasks, showAllProjects).map((group) => {
+          {groupTasksByProject(showAllProjects).map((group) => {
             const isExpanded = expandedProjects.has(group.project.id);
             const completedTasks = group.tasks.filter(t => t.status === TASK_STATUS.DONE).length;
             const overdueTasks = group.tasks.filter(t => isOverdue(t)).length;
@@ -1097,7 +1275,7 @@ const TasksView = () => {
         </div>
       )}
 
-      {tasks.length === 0 && !loading && !showAllProjects && (
+      {totalTasksCount === 0 && !(projectsLoading || loadingTasks) && !showAllProjects && (
         <div className="text-center py-12">
           <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
             <Clock className="h-12 w-12 text-gray-400" />
@@ -1122,7 +1300,7 @@ const TasksView = () => {
       )}
 
       {/* Mensaje cuando showAllProjects está activo pero no hay proyectos */}
-      {tasks.length === 0 && !loading && showAllProjects && projects?.length === 0 && (
+      {totalTasksCount === 0 && !(projectsLoading || loadingTasks) && showAllProjects && projects?.length === 0 && (
         <div className="text-center py-12">
           <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
             <Clock className="h-12 w-12 text-gray-400" />
@@ -1134,31 +1312,37 @@ const TasksView = () => {
         </div>
       )}
 
-      {/* Pagination */}
-      {pagination.totalPages > 1 && (
+      {/* Pagination for Projects */}
+      {projects && projects.length > 0 && projectsPagination && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-600">
-            Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
-            {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
-            {pagination.total} tasks
+            Showing {((projectsPagination.page - 1) * projectsPagination.limit) + 1} to{' '}
+            {Math.min(projectsPagination.page * projectsPagination.limit, projectsPagination.total)} of{' '}
+            {projectsPagination.total} projects ({totalTasksCount} total tasks)
           </div>
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"
               size="sm"
-              disabled={pagination.page === 1}
-              onClick={() => fetchTasks({ ...filters, page: pagination.page - 1 })}
+              disabled={projectsPagination.page === 1}
+              onClick={() => {
+                const newPage = projectsPagination.page - 1;
+                fetchProjects({ ...filters, page: newPage, limit: projectsPagination.limit });
+              }}
             >
               Previous
             </Button>
             <span className="text-sm">
-              Page {pagination.page} of {pagination.totalPages}
+              Page {projectsPagination.page} of {projectsPagination.totalPages}
             </span>
             <Button
               variant="outline"
               size="sm"
-              disabled={pagination.page === pagination.totalPages}
-              onClick={() => fetchTasks({ ...filters, page: pagination.page + 1 })}
+              disabled={projectsPagination.page >= projectsPagination.totalPages}
+              onClick={() => {
+                const newPage = projectsPagination.page + 1;
+                fetchProjects({ ...filters, page: newPage, limit: projectsPagination.limit });
+              }}
             >
               Next
             </Button>

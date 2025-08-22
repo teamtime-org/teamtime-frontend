@@ -70,7 +70,7 @@ const ProjectDetailsTab = ({ project }) => {
           <DetailItem 
             icon={Clock} 
             label="Estimated Hours" 
-            value={formatDuration(project.estimatedHours)} 
+            value={project.estimatedHours ? formatDuration(project.estimatedHours) : 'No estimado'} 
           />
 
           <div className="flex items-center space-x-2">
