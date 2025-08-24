@@ -37,6 +37,26 @@ export const systemConfigService = {
     return response.data;
   },
 
+  // Obtener configuraciones de restricciones de fecha
+  getDateRestrictionConfigs: async () => {
+    const response = await api.get('/system-config/date-restrictions');
+    return response.data;
+  },
+
+  // Configurar restricciones de fecha para timesheet
+  setDateRestrictionConfigs: async (configs) => {
+    const response = await api.put('/system-config/date-restrictions', configs);
+    return response.data;
+  },
+
+  // Validar fecha para registro de tiempo
+  validateDateForTimeEntry: async (date) => {
+    const response = await api.get('/system-config/validate-date', { 
+      params: { date: date.toISOString().split('T')[0] }
+    });
+    return response.data;
+  },
+
   // Inicializar configuraciones por defecto
   initializeDefaults: async () => {
     const response = await api.post('/system-config/initialize');

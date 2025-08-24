@@ -2,13 +2,13 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Save, Filter, Search } from 'lucide-react';
 import { Button, Card, CardContent, CardHeader, CardTitle, Loading, Input } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
-import { useAssignedTasks } from '@/hooks/useTasks';
 import { taskService } from '@/services/taskService';
 import { useAssignedProjects, useAllProjects } from '@/hooks/useProjects';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useAreas } from '@/hooks/useAreas';
 import { useCatalogs } from '@/hooks/useCatalogs';
 import useUsers from '@/hooks/useUsers';
+import { useDateRestrictions } from '@/hooks/useSystemConfig';
 import { timesheetService } from '@/services/timesheetService';
 import { formatDate } from '@/utils';
 import { ROLES } from '@/constants';
@@ -16,32 +16,34 @@ import { ROLES } from '@/constants';
 const TimesheetMatrix = () => {
   const { user, userId } = useAuth();
   const { t } = useTranslation();
-  
+
   // Determinar roles del usuario
   const isAdmin = user?.role === ROLES.ADMIN;
   const isCoordinator = user?.role === ROLES.MANAGER || user?.role === ROLES.COORDINADOR;
   const isCollaborator = user?.role === ROLES.COLABORADOR;
-  
+
   // Usar todos los proyectos para admins, solo asignados para usuarios normales
   const { projects: assignedProjects, loading: assignedLoading } = useAssignedProjects();
   const { projects: allProjects, loading: allLoading } = useAllProjects();
-  
+
   const projects = isAdmin ? allProjects : assignedProjects;
   const projectsLoading = isAdmin ? allLoading : assignedLoading;
-  
+
+
   // Estado para tareas agrupadas por proyecto
   const [projectTasks, setProjectTasks] = useState({});
   const [loadingTasks, setLoadingTasks] = useState(false);
   const { areas } = useAreas();
   const { salesManagements, mentors, coordinators } = useCatalogs();
   const { users, fetchAllUsers: loadAllUsers } = useUsers();
+  const { restrictions: dateRestrictions, isDateAllowed } = useDateRestrictions();
 
   const [weekStart, setWeekStart] = useState(() => {
     const today = new Date();
     const dayOfWeek = today.getDay();
     const monday = new Date(today);
     monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-    monday.setHours(0, 0, 0, 0);
+    monday.setHours(12, 0, 0, 0); // Establecer a mediodía para evitar problemas de timezone
     return monday;
   });
 
@@ -50,7 +52,7 @@ const TimesheetMatrix = () => {
   const [saveIndicator, setSaveIndicator] = useState({});
   const [filters, setFilters] = useState({
     search: '',
-    status: '',
+    status: 'ACTIVE', // Por defecto mostrar solo proyectos activos
     priority: '',
     areaId: '',
     // Filtros de asignaciones reales
@@ -96,51 +98,51 @@ const TimesheetMatrix = () => {
   // Filtrar proyectos con todos los filtros aplicados - igual que ProjectsView
   const filteredProjects = useMemo(() => {
     if (!projects) return [];
-    
+
     return projects.filter(project => {
       // Filtro por búsqueda
-      if (filters.search && 
-          !project.name?.toLowerCase().includes(filters.search.toLowerCase()) &&
-          !project.description?.toLowerCase().includes(filters.search.toLowerCase())) {
+      if (filters.search &&
+        !project.name?.toLowerCase().includes(filters.search.toLowerCase()) &&
+        !project.description?.toLowerCase().includes(filters.search.toLowerCase())) {
         return false;
       }
-      
+
       // Filtro por estado
       if (filters.status && project.status !== filters.status) {
         return false;
       }
-      
+
       // Filtro por prioridad
       if (filters.priority && project.priority !== filters.priority) {
         return false;
       }
-      
+
       // Filtro por área
       if (filters.areaId && project.areaId !== filters.areaId) {
         return false;
       }
-      
+
       // Filtro por coordinador
       if (filters.coordinatorId && project.excelDetails?.coordinator?.id !== filters.coordinatorId) {
         return false;
       }
-      
+
       // Filtro por mentor
       if (filters.mentorId && project.excelDetails?.mentor?.id !== filters.mentorId) {
         return false;
       }
-      
+
       // Filtro por gerencia de ventas
       if (filters.salesManagementId && project.excelDetails?.salesManagement?.id !== filters.salesManagementId) {
         return false;
       }
-      
+
       // Filtro por orden Siebel
-      if (filters.siebelOrderNumber && 
-          !project.excelDetails?.siebelOrderNumber?.toLowerCase().includes(filters.siebelOrderNumber.toLowerCase())) {
+      if (filters.siebelOrderNumber &&
+        !project.excelDetails?.siebelOrderNumber?.toLowerCase().includes(filters.siebelOrderNumber.toLowerCase())) {
         return false;
       }
-      
+
       // Filtro por isGeneral
       if (filters.isGeneral !== '' && filters.isGeneral !== null && filters.isGeneral !== undefined) {
         const isGeneralValue = filters.isGeneral === 'true';
@@ -148,7 +150,7 @@ const TimesheetMatrix = () => {
           return false;
         }
       }
-      
+
       return true;
     });
   }, [projects, filters]);
@@ -175,7 +177,7 @@ const TimesheetMatrix = () => {
       results.forEach(({ projectId, tasks }) => {
         tasksMap[projectId] = tasks;
       });
-      
+
       setProjectTasks(tasksMap);
     } catch (err) {
       console.error('Error loading project tasks:', err);
@@ -193,24 +195,67 @@ const TimesheetMatrix = () => {
   // Generar array de días L-D (memoizado para evitar recálculos)
   const weekDays = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
-      const day = new Date(weekStart);
-      day.setDate(weekStart.getDate() + i);
+      const day = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i, 12, 0, 0);
       return day;
     });
   }, [weekStart]);
 
   // Agrupar tareas por proyecto - mostrar solo tareas reales del proyecto
   const projectTaskGroups = useMemo(() => {
-    return filteredProjects?.map(project => {
-      // Obtener tareas del proyecto
-      const tasks = projectTasks[project.id] || [];
+    if (!filteredProjects || filteredProjects.length === 0) {
+      return [];
+    }
 
+    const groups = filteredProjects.map(project => {
+      const tasks = projectTasks[project.id] || [];
       return {
         project,
         tasks: tasks
       };
-    }).filter(group => group.tasks.length > 0) || []; // Solo mostrar proyectos que tienen tareas
+    }).filter(group => group.tasks.length > 0);
+
+    // If no groups have tasks, show projects anyway to allow task creation
+    if (groups.length === 0) {
+      return filteredProjects.map(project => ({
+        project,
+        tasks: []
+      }));
+    }
+
+    return groups;
   }, [filteredProjects, projectTasks]);
+
+  // Normalizar fecha a formato YYYY-MM-DD sin conversiones de timezone
+  const normalizeDateString = useCallback((date) => {
+    if (!date) return '';
+    
+    // Si ya está en formato YYYY-MM-DD, devolverlo
+    if (typeof date === 'string') {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return date;
+      }
+      // Si tiene T (ISO), simplemente tomar la parte de la fecha sin conversiones
+      if (date.includes('T')) {
+        return date.split('T')[0];
+      }
+    }
+    
+    // Para objetos Date, extraer fecha local
+    let dateObj;
+    if (date instanceof Date) {
+      dateObj = date;
+    } else {
+      dateObj = new Date(date);
+    }
+    
+    if (isNaN(dateObj.getTime())) return '';
+    
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
+  }, []);
 
   // Cargar entradas de tiempo existentes
   const loadTimeEntries = useCallback(async () => {
@@ -218,51 +263,62 @@ const TimesheetMatrix = () => {
 
     setLoading(true);
     try {
-      const startDate = formatDate(weekStart);
-      const endDate = formatDate(weekDays[6]);
-
-      console.log('[TimesheetMatrix] Loading time entries for:', { userId, startDate, endDate });
+      const startDate = formatDate(weekStart, 'yyyy-MM-dd');
+      const endWeek = new Date(weekStart);
+      endWeek.setDate(weekStart.getDate() + 6);
+      const endDate = formatDate(endWeek, 'yyyy-MM-dd');
 
       const response = await timesheetService.getTimeEntries({
         userId: userId,
         startDate,
-        endDate
+        endDate,
+        _t: Date.now()
       });
 
-      const entries = response.timeEntries || response.data?.timeEntries || [];
-      console.log('[TimesheetMatrix] Loaded entries:', entries.length, 'entries');
-      console.log('[TimesheetMatrix] Entries details:', entries.map(e => ({ id: e.id, taskId: e.taskId, hours: e.hours, date: e.date })));
+      const entries = response.data?.timeEntries || response.timeEntries || [];
       setTimeEntries(entries);
     } catch (error) {
       console.error('Error al cargar entradas:', error);
-      // Implementar retry con backoff si es error 429
       if (error.response?.status === 429) {
         setTimeout(() => {
           setLoading(false);
-        }, 5000); // Esperar 5 segundos antes de permitir otra llamada
+        }, 5000);
         return;
       }
     } finally {
       setLoading(false);
     }
-  }, [userId, weekStart, weekDays]);
+  }, [userId, weekStart]);
+
+  // Función para limpiar entradas temporales y timeouts
+  const cleanupTemporaryData = useCallback(() => {
+    // Limpiar entradas temporales
+    setTimeEntries(prev => prev.filter(entry =>
+      !(entry.id && entry.id.toString().startsWith('temp-'))
+    ));
+
+    // Limpiar indicadores de guardado
+    setSaveIndicator({});
+
+    // Limpiar todos los timeouts pendientes
+    Object.keys(window).forEach(key => {
+      if (key.startsWith('timeout-')) {
+        clearTimeout(window[key]);
+        delete window[key];
+      }
+    });
+  }, []);
 
   useEffect(() => {
-    // Debug: verificar datos del usuario al cargar
-    console.log('TimesheetMatrix useEffect - datos del usuario:', {
-      user,
-      userId,
-      userKeys: user ? Object.keys(user) : null,
-      token: localStorage.getItem('auth_token')
-    });
-
-    // Solo cargar si realmente cambió la semana o el usuario
+    cleanupTemporaryData();
+    
     const timeoutId = setTimeout(() => {
       loadTimeEntries();
-    }, 100); // Debounce de 100ms para evitar llamadas múltiples
+    }, 100);
 
     return () => clearTimeout(timeoutId);
-  }, [weekStart, userId]); // Solo depender de weekStart y userId
+  }, [weekStart, userId, cleanupTemporaryData, loadTimeEntries]);
+
 
   // Limpiar timeouts al desmontar componente
   useEffect(() => {
@@ -278,52 +334,42 @@ const TimesheetMatrix = () => {
   }, []);
 
   // Obtener horas para una tarea y día específico
-  const getHoursForTaskAndDay = (taskId, date) => {
-    const targetDateStr = date.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+  const getHoursForTaskAndDay = useCallback((taskId, date) => {
+    const targetDateStr = normalizeDateString(date);
     
     const entry = timeEntries.find(entry => {
-      let entryDateStr;
-      if (typeof entry.date === 'string') {
-        entryDateStr = entry.date.split('T')[0];
-      } else {
-        entryDateStr = new Date(entry.date).toISOString().split('T')[0];
-      }
+      const entryDateStr = normalizeDateString(entry.date);
       return entry.taskId === taskId && entryDateStr === targetDateStr;
     });
-    return entry?.hours || '';
-  };
+
+    return entry ? (typeof entry.hours === 'string' ? entry.hours : String(entry.hours)) : '';
+  }, [timeEntries, normalizeDateString]);
 
   // Obtener ID de entrada para una tarea y día específico
-  const getEntryId = (taskId, date) => {
-    const targetDateStr = date.toISOString().split('T')[0]; // Formato YYYY-MM-DD
-    
+  const getEntryId = useCallback((taskId, date) => {
+    const targetDateStr = normalizeDateString(date);
+
     const entry = timeEntries.find(entry => {
-      let entryDateStr;
-      if (typeof entry.date === 'string') {
-        entryDateStr = entry.date.split('T')[0];
-      } else {
-        entryDateStr = new Date(entry.date).toISOString().split('T')[0];
-      }
+      const entryDateStr = normalizeDateString(entry.date);
       return entry.taskId === taskId && entryDateStr === targetDateStr;
     });
+
     return entry?.id;
-  };
+  }, [timeEntries, normalizeDateString]);
 
   // State para manejar las peticiones en cola
   const [pendingRequests, setPendingRequests] = useState(new Set());
 
   // Autosave con debounce y rate limiting
   const autosave = useCallback(async (taskId, projectId, date, hours) => {
-    const key = `${taskId}-${formatDate(date)}`;
+    // date ya viene en formato YYYY-MM-DD
+    const key = `${taskId}-${date}`;
 
-    // Verificar que tengamos userId antes de proceder
     if (!userId) {
-      console.error('No se puede guardar: userId no disponible', { user, userId });
       setSaveIndicator(prev => ({ ...prev, [key]: 'error' }));
       return;
     }
 
-    // Evitar peticiones duplicadas
     if (pendingRequests.has(key)) {
       return;
     }
@@ -335,7 +381,6 @@ const TimesheetMatrix = () => {
       const existingEntryId = getEntryId(taskId, date);
 
       if (hours === '' || hours === '0' || parseFloat(hours) === 0) {
-        // Eliminar entrada si existe y horas es 0 o vacío
         if (existingEntryId) {
           await timesheetService.deleteTimeEntry(existingEntryId);
           setTimeEntries(prev => prev.filter(entry => entry.id !== existingEntryId));
@@ -347,56 +392,47 @@ const TimesheetMatrix = () => {
           return;
         }
 
+        // Enviar fecha como año, mes, día separados para evitar problemas de timezone
+        // date viene en formato YYYY-MM-DD string
+        const [year, month, day] = date.split('-').map(n => parseInt(n));
+        
         const entryData = {
           userId: userId,
           projectId,
           taskId,
-          date: date.toISOString().split('T')[0], // Solo la fecha YYYY-MM-DD
+          year: year,
+          month: month,
+          day: day,
           hours: hoursFloat,
-          description: `Trabajo en tarea`
+          description: 'Trabajo en tarea'
         };
         
-        console.log('[TimesheetMatrix] About to save entry:', entryData);
-        console.log('[TimesheetMatrix] User ID:', userId, 'Project ID:', projectId, 'Task ID:', taskId);
+        console.log('[Autosave] Entry data to send:', entryData);
+        console.log('[Autosave] Date as integers - Year:', year, 'Month:', month, 'Day:', day);
 
         if (existingEntryId) {
-          // Actualizar entrada existente
           const response = await timesheetService.updateTimeEntry(existingEntryId, entryData);
           const updatedEntry = response.data || response;
           setTimeEntries(prev => prev.map(entry =>
             entry.id === existingEntryId ? updatedEntry : entry
           ));
         } else {
-          // Crear nueva entrada
           const response = await timesheetService.createTimeEntry(entryData);
           const newEntry = response.data || response;
-          console.log('[TimesheetMatrix] Adding new entry to state:', newEntry);
-          console.log('[TimesheetMatrix] Current timeEntries before adding:', timeEntries.length);
           setTimeEntries(prev => {
-            console.log('[TimesheetMatrix] Current state entries:', prev.length);
-            
-            // Primero, remover cualquier entrada temporal para esta tarea y fecha
-            const targetDateStr = date.toISOString().split('T')[0];
+            const targetDateStr = normalizeDateString(date);
             const withoutTemp = prev.filter(entry => {
               if (entry.id && entry.id.toString().startsWith('temp-')) {
-                let entryDateStr;
-                if (typeof entry.date === 'string') {
-                  entryDateStr = entry.date.split('T')[0];
-                } else {
-                  entryDateStr = new Date(entry.date).toISOString().split('T')[0];
-                }
+                const entryDateStr = normalizeDateString(entry.date);
                 return !(entry.taskId === taskId && entryDateStr === targetDateStr);
               }
               return true;
             });
-            
-            // Verificar que no exista ya una entrada real con el mismo ID
+
             const exists = withoutTemp.some(entry => entry.id === newEntry.id);
             if (exists) {
-              console.log('[TimesheetMatrix] Entry already exists, updating instead of adding');
               return withoutTemp.map(entry => entry.id === newEntry.id ? newEntry : entry);
             }
-            console.log('[TimesheetMatrix] Adding new entry, will have:', withoutTemp.length + 1, 'entries');
             return [...withoutTemp, newEntry];
           });
         }
@@ -411,13 +447,11 @@ const TimesheetMatrix = () => {
       console.error('Error al guardar entrada de tiempo:', error.response?.data?.message || error.message);
       setSaveIndicator(prev => ({ ...prev, [key]: 'error' }));
 
-      // Si es error 429, esperar más tiempo antes de permitir otra petición
       const waitTime = error.response?.status === 429 ? 5000 : 3000;
       setTimeout(() => {
         setSaveIndicator(prev => ({ ...prev, [key]: null }));
       }, waitTime);
     } finally {
-      // Limpiar la petición pendiente después de un delay
       setTimeout(() => {
         setPendingRequests(prev => {
           const newSet = new Set(prev);
@@ -426,41 +460,43 @@ const TimesheetMatrix = () => {
         });
       }, 1000);
     }
-  }, [timeEntries, getEntryId, pendingRequests, user?.id]);
+  }, [getEntryId, pendingRequests, userId, normalizeDateString]);
 
   // Manejar cambio en input con debounce
   const handleHoursChange = useCallback((taskId, projectId, date, value) => {
-    const key = `${taskId}-${formatDate(date)}`;
+    const normalizedDate = normalizeDateString(date);
+    const key = `${taskId}-${normalizedDate}`;
+
+    // Validar fecha antes de procesar
+    const dateValidation = isDateAllowed(date);
+    if (!dateValidation.isValid && parseFloat(value) > 0) {
+      // Mostrar mensaje de error pero no guardar
+      setSaveIndicator(prev => ({ ...prev, [key]: 'error' }));
+      setTimeout(() => {
+        setSaveIndicator(prev => ({ ...prev, [key]: null }));
+      }, 3000);
+      return; // No procesar el cambio
+    }
 
     // Actualizar display inmediatamente
     setTimeEntries(prev => {
-      const targetDateStr = date.toISOString().split('T')[0]; // Formato YYYY-MM-DD consistente
-      
+      const targetDateStr = normalizeDateString(date); // Usar normalización consistente
+
       // Buscar entrada existente (real, no temporal)
       const existingIndex = prev.findIndex(entry => {
         // No considerar entradas temporales como existentes
         if (entry.id && entry.id.toString().startsWith('temp-')) {
           return false;
         }
-        
-        let entryDateStr;
-        if (typeof entry.date === 'string') {
-          entryDateStr = entry.date.split('T')[0];
-        } else {
-          entryDateStr = new Date(entry.date).toISOString().split('T')[0];
-        }
+
+        const entryDateStr = normalizeDateString(entry.date);
         return entry.taskId === taskId && entryDateStr === targetDateStr;
       });
 
       // Remover cualquier entrada temporal existente para esta tarea y fecha
       const withoutTemp = prev.filter(entry => {
         if (entry.id && entry.id.toString().startsWith('temp-')) {
-          let entryDateStr;
-          if (typeof entry.date === 'string') {
-            entryDateStr = entry.date.split('T')[0];
-          } else {
-            entryDateStr = new Date(entry.date).toISOString().split('T')[0];
-          }
+          const entryDateStr = normalizeDateString(entry.date);
           return !(entry.taskId === taskId && entryDateStr === targetDateStr);
         }
         return true;
@@ -470,16 +506,11 @@ const TimesheetMatrix = () => {
         // Actualizar entrada real existente
         const updated = [...withoutTemp];
         const realExistingIndex = updated.findIndex(entry => {
-          let entryDateStr;
-          if (typeof entry.date === 'string') {
-            entryDateStr = entry.date.split('T')[0];
-          } else {
-            entryDateStr = new Date(entry.date).toISOString().split('T')[0];
-          }
-          return entry.taskId === taskId && entryDateStr === targetDateStr && 
-                 !(entry.id && entry.id.toString().startsWith('temp-'));
+          const entryDateStr = normalizeDateString(entry.date);
+          return entry.taskId === taskId && entryDateStr === targetDateStr &&
+            !(entry.id && entry.id.toString().startsWith('temp-'));
         });
-        
+
         if (realExistingIndex >= 0) {
           updated[realExistingIndex] = { ...updated[realExistingIndex], hours: parseFloat(value) || 0 };
         }
@@ -490,59 +521,55 @@ const TimesheetMatrix = () => {
           id: `temp-${taskId}-${targetDateStr}-${Date.now()}`,
           taskId,
           projectId,
-          date: targetDateStr, // Usar formato YYYY-MM-DD consistente
+          date: targetDateStr, // Usar formato normalizado consistente
           hours: parseFloat(value) || 0,
           userId: userId
         }];
       }
-      
+
       return withoutTemp; // Retornar sin las temporales si el valor es 0 o vacío
     });
 
     // Debounce autosave - aumentado a 2 segundos para reducir llamadas
     clearTimeout(window[`timeout-${key}`]);
     window[`timeout-${key}`] = setTimeout(() => {
-      autosave(taskId, projectId, date, value);
+      // Pasar la fecha normalizada en formato YYYY-MM-DD
+      const normalizedDate = normalizeDateString(date);
+      autosave(taskId, projectId, normalizedDate, value);
     }, 2000);
-  }, [autosave, userId]);
+  }, [autosave, userId, isDateAllowed, normalizeDateString]);
+
 
   // Navegación de semana
   const goToPreviousWeek = () => {
-    const newWeekStart = new Date(weekStart);
-    newWeekStart.setDate(weekStart.getDate() - 7);
+    cleanupTemporaryData();
+    const newWeekStart = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 7, 12, 0, 0);
     setWeekStart(newWeekStart);
   };
 
   const goToNextWeek = () => {
-    const newWeekStart = new Date(weekStart);
-    newWeekStart.setDate(weekStart.getDate() + 7);
+    cleanupTemporaryData();
+    const newWeekStart = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7, 12, 0, 0);
     setWeekStart(newWeekStart);
   };
 
   // Calcular totales por día
   const getDayTotal = (date) => {
-    const targetDateStr = date.toISOString().split('T')[0]; // Formato YYYY-MM-DD
-    
+    const targetDateStr = normalizeDateString(date);
+
     // Filtrar entradas que coincidan con la fecha y excluir entradas temporales
     const matchingEntries = timeEntries.filter(entry => {
       // Excluir entradas temporales (creadas para display inmediato)
       if (entry.id && entry.id.toString().startsWith('temp-')) {
         return false;
       }
-      
-      let entryDateStr;
-      if (typeof entry.date === 'string') {
-        // Si es string, puede ser "YYYY-MM-DD" o "YYYY-MM-DDTHH:mm:ss.sssZ"
-        entryDateStr = entry.date.split('T')[0];
-      } else {
-        // Si es Date, convertir a string
-        entryDateStr = new Date(entry.date).toISOString().split('T')[0];
-      }
+
+      const entryDateStr = normalizeDateString(entry.date);
       return entryDateStr === targetDateStr;
     });
 
     const total = matchingEntries.reduce((sum, entry) => sum + (parseFloat(entry.hours) || 0), 0);
-    
+
     return total;
   };
 
@@ -584,7 +611,7 @@ const TimesheetMatrix = () => {
               <option value="CANCELLED">{t('cancelled')}</option>
               <option value="AWARDED">Ganado</option>
             </select>
-            
+
             {/* Navegación de semana */}
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={goToPreviousWeek}>
@@ -599,10 +626,10 @@ const TimesheetMatrix = () => {
             </div>
           </div>
         </div>
-        
+
         {/* Información sobre proyectos cargados */}
         <div className="text-sm text-gray-600">
-          Mostrando {filteredProjects.length} proyecto(s) {filters.status ? filters.status.toLowerCase() : ''} 
+          Mostrando {filteredProjects.length} proyecto(s) {filters.status ? filters.status.toLowerCase() : ''}
           {isAdmin ? ' (todos los proyectos del sistema)' : ' (asignados a ti)'}
         </div>
       </CardHeader>
@@ -653,166 +680,167 @@ const TimesheetMatrix = () => {
             </select>
 
             {(isAdmin || isCoordinator) ? (
-            <select
-              value={filters.areaId}
-              onChange={(e) => handleFilterChange('areaId', e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="">Todas las Áreas</option>
-              {areas && areas.map((area) => (
-                <option key={area.id} value={area.id}>
-                  {area.name}
-                </option>
-              ))}
-            </select>
+              <select
+                value={filters.areaId}
+                onChange={(e) => handleFilterChange('areaId', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Todas las Áreas</option>
+                {areas && areas.map((area) => (
+                  <option key={area.id} value={area.id}>
+                    {area.name}
+                  </option>
+                ))}
+              </select>
             ) : (
-            <select
-              value={filters.areaId}
-              onChange={(e) => handleFilterChange('areaId', e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="">Mi Área</option>
-              {areas && areas.filter(area => area.id === user?.areaId).map((area) => (
-                <option key={area.id} value={area.id}>
-                  {area.name}
-                </option>
-              ))}
-            </select>
+              <select
+                value={filters.areaId}
+                onChange={(e) => handleFilterChange('areaId', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Mi Área</option>
+                {areas && areas.filter(area => area.id === user?.areaId).map((area) => (
+                  <option key={area.id} value={area.id}>
+                    {area.name}
+                  </option>
+                ))}
+              </select>
             )}
           </div>
 
           {/* Segunda fila de filtros - Solo para administradores y coordinadores */}
           {!isCollaborator && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4 mt-4">
-            <select
-              value={filters.assignedUserId}
-              onChange={(e) => handleFilterChange('assignedUserId', e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="">Usuarios Asignados</option>
-              <option value="me">Mis Proyectos</option>
-              {users && users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.firstName} {user.lastName}
-                </option>
-              ))}
-            </select>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4 mt-4">
+              <select
+                value={filters.assignedUserId}
+                onChange={(e) => handleFilterChange('assignedUserId', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Usuarios Asignados</option>
+                <option value="me">Mis Proyectos</option>
+                {users && users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.firstName} {user.lastName}
+                  </option>
+                ))}
+              </select>
 
-            <select
-              value={filters.mentorId}
-              onChange={(e) => handleFilterChange('mentorId', e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="">Todos los Mentores</option>
-              {mentors && mentors.map((mentor) => (
-                <option key={mentor.id} value={mentor.id}>
-                  {mentor.firstName} {mentor.lastName}
-                </option>
-              ))}
-            </select>
+              <select
+                value={filters.mentorId}
+                onChange={(e) => handleFilterChange('mentorId', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Todos los Mentores</option>
+                {mentors && mentors.map((mentor) => (
+                  <option key={mentor.id} value={mentor.id}>
+                    {mentor.firstName} {mentor.lastName}
+                  </option>
+                ))}
+              </select>
 
-            <select
-              value={filters.coordinatorId}
-              onChange={(e) => handleFilterChange('coordinatorId', e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="">Todos los Coordinadores</option>
-              {coordinators && coordinators.map((coordinator) => (
-                <option key={coordinator.id} value={coordinator.id}>
-                  {coordinator.firstName} {coordinator.lastName}
-                </option>
-              ))}
-            </select>
+              <select
+                value={filters.coordinatorId}
+                onChange={(e) => handleFilterChange('coordinatorId', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Todos los Coordinadores</option>
+                {coordinators && coordinators.map((coordinator) => (
+                  <option key={coordinator.id} value={coordinator.id}>
+                    {coordinator.firstName} {coordinator.lastName}
+                  </option>
+                ))}
+              </select>
 
-            <select
-              value={filters.salesManagementId}
-              onChange={(e) => handleFilterChange('salesManagementId', e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="">Todas las Gerencias</option>
-              {salesManagements && salesManagements.map((management) => (
-                <option key={management.id} value={management.id}>
-                  {management.name}
-                </option>
-              ))}
-            </select>
+              <select
+                value={filters.salesManagementId}
+                onChange={(e) => handleFilterChange('salesManagementId', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Todas las Gerencias</option>
+                {salesManagements && salesManagements.map((management) => (
+                  <option key={management.id} value={management.id}>
+                    {management.name}
+                  </option>
+                ))}
+              </select>
 
-            <Input
-              placeholder="Orden Siebel..."
-              value={filters.siebelOrderNumber}
-              onChange={(e) => handleFilterChange('siebelOrderNumber', e.target.value)}
-            />
+              <Input
+                placeholder="Orden Siebel..."
+                value={filters.siebelOrderNumber}
+                onChange={(e) => handleFilterChange('siebelOrderNumber', e.target.value)}
+              />
 
-            <select
-              value={filters.isGeneral}
-              onChange={(e) => handleFilterChange('isGeneral', e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="">Todos los Tipos</option>
-              <option value="true">Solo Generales</option>
-              <option value="false">Solo Específicos</option>
-            </select>
+              <select
+                value={filters.isGeneral}
+                onChange={(e) => handleFilterChange('isGeneral', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Todos los Tipos</option>
+                <option value="true">Solo Generales</option>
+                <option value="false">Solo Específicos</option>
+              </select>
 
-            <Button
-              variant="outline"
-              onClick={clearAllFilters}
-              className="whitespace-nowrap"
-            >
-              Limpiar Filtros
-            </Button>
-          </div>
+              <Button
+                variant="outline"
+                onClick={clearAllFilters}
+                className="whitespace-nowrap"
+              >
+                Limpiar Filtros
+              </Button>
+            </div>
           )}
 
           {/* Fila de filtros para colaboradores - Filtros de sus proyectos */}
           {isCollaborator && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
-            <select
-              value={filters.coordinatorId}
-              onChange={(e) => handleFilterChange('coordinatorId', e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="">Todos los Coordinadores</option>
-              {coordinators && coordinators.map((coordinator) => (
-                <option key={coordinator.id} value={coordinator.id}>
-                  {coordinator.firstName} {coordinator.lastName}
-                </option>
-              ))}
-            </select>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
+              <select
+                value={filters.coordinatorId}
+                onChange={(e) => handleFilterChange('coordinatorId', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Todos los Coordinadores</option>
+                {coordinators && coordinators.map((coordinator) => (
+                  <option key={coordinator.id} value={coordinator.id}>
+                    {coordinator.firstName} {coordinator.lastName}
+                  </option>
+                ))}
+              </select>
 
-            <select
-              value={filters.salesManagementId}
-              onChange={(e) => handleFilterChange('salesManagementId', e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="">Todas las Gerencias</option>
-              {salesManagements && salesManagements.map((management) => (
-                <option key={management.id} value={management.id}>
-                  {management.name}
-                </option>
-              ))}
-            </select>
+              <select
+                value={filters.salesManagementId}
+                onChange={(e) => handleFilterChange('salesManagementId', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Todas las Gerencias</option>
+                {salesManagements && salesManagements.map((management) => (
+                  <option key={management.id} value={management.id}>
+                    {management.name}
+                  </option>
+                ))}
+              </select>
 
-            <select
-              value={filters.isGeneral}
-              onChange={(e) => handleFilterChange('isGeneral', e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="">Todos los Tipos</option>
-              <option value="true">Solo Generales</option>
-              <option value="false">Solo Específicos</option>
-            </select>
+              <select
+                value={filters.isGeneral}
+                onChange={(e) => handleFilterChange('isGeneral', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Todos los Tipos</option>
+                <option value="true">Solo Generales</option>
+                <option value="false">Solo Específicos</option>
+              </select>
 
-            <Button
-              variant="outline"
-              onClick={clearAllFilters}
-              className="whitespace-nowrap"
-            >
-              Limpiar Filtros
-            </Button>
-          </div>
+              <Button
+                variant="outline"
+                onClick={clearAllFilters}
+                className="whitespace-nowrap"
+              >
+                Limpiar Filtros
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
+
 
       <CardContent>
         <div className="overflow-x-auto">
@@ -843,16 +871,16 @@ const TimesheetMatrix = () => {
                   <td colSpan={9} className="border border-gray-300 p-8 text-center">
                     <div className="text-gray-500">
                       <div className="text-lg font-medium mb-2">
-                        {filters.status === 'ACTIVE' 
-                          ? (isAdmin ? 'Sin Proyectos Activos en el Sistema' : 'Sin Proyectos Activos Asignados') 
-                          : filters.status 
-                          ? `Sin Proyectos ${filters.status} ${isAdmin ? 'en el Sistema' : 'Asignados'}`
-                          : (isAdmin ? 'Sin Proyectos en el Sistema' : 'Sin Proyectos Asignados')}
+                        {filters.status === 'ACTIVE'
+                          ? (isAdmin ? 'Sin Proyectos Activos en el Sistema' : 'Sin Proyectos Activos Asignados')
+                          : filters.status
+                            ? `Sin Proyectos ${filters.status} ${isAdmin ? 'en el Sistema' : 'Asignados'}`
+                            : (isAdmin ? 'Sin Proyectos en el Sistema' : 'Sin Proyectos Asignados')}
                       </div>
                       <div className="text-sm">
-                        {projects?.length > 0 
+                        {projects?.length > 0
                           ? 'No hay proyectos que coincidan con los filtros seleccionados. Cambia los filtros arriba para ver otros proyectos.'
-                          : isAdmin 
+                          : isAdmin
                             ? 'No hay proyectos en el sistema. Crea algunos proyectos para empezar a usarlos en el timesheet.'
                             : 'No tienes proyectos asignados. Contacta a tu coordinador para que te asigne proyectos.'
                         }
@@ -887,11 +915,22 @@ const TimesheetMatrix = () => {
                           </div>
                         </td>
                         {weekDays.map((day, dayIndex) => {
-                          const key = `${task.id}-${formatDate(day)}`;
+                          const normalizedDay = normalizeDateString(day);
+                          const key = `${task.id}-${normalizedDay}`;
                           const saveStatus = saveIndicator[key];
+                          const dateValidation = isDateAllowed(day);
+                          const isDateRestricted = !dateValidation.isValid;
+
                           return (
-                            <td key={dayIndex} className="border border-gray-300 p-1">
-                              <div className="relative">
+                            <td key={dayIndex} className="border border-gray-300 p-1 relative">
+                              {/* Indicador visual para fechas restringidas */}
+                              {isDateRestricted && (
+                                <div
+                                  className="absolute inset-0 bg-red-100 opacity-30 pointer-events-none z-0"
+                                  title={dateValidation.reason}
+                                ></div>
+                              )}
+                              <div className="relative z-10">
                                 <input
                                   type="number"
                                   min="0"
@@ -899,11 +938,15 @@ const TimesheetMatrix = () => {
                                   step="0.25"
                                   value={getHoursForTaskAndDay(task.id, day)}
                                   onChange={(e) => handleHoursChange(task.id, project.id, day, e.target.value)}
-                                  className={`w-full p-2 text-center border-0 bg-transparent focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 rounded ${saveStatus === 'saving' ? 'bg-yellow-50' :
-                                    saveStatus === 'saved' ? 'bg-green-50' :
-                                      saveStatus === 'error' ? 'bg-red-50' : ''
-                                    }`}
+                                  disabled={isDateRestricted}
+                                  className={`w-full p-2 text-center border-0 bg-transparent focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 rounded 
+                                    ${saveStatus === 'saving' ? 'bg-yellow-50' :
+                                      saveStatus === 'saved' ? 'bg-green-50' :
+                                        saveStatus === 'error' ? 'bg-red-50' : ''}
+                                    ${isDateRestricted ? 'cursor-not-allowed text-gray-400' : ''}
+                                  `}
                                   placeholder="0"
+                                  title={isDateRestricted ? dateValidation.reason : ''}
                                 />
                                 {saveStatus === 'saving' && (
                                   <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
@@ -940,13 +983,10 @@ const TimesheetMatrix = () => {
                   ))}
                   <td className="border border-gray-300 p-3 text-center">
                     {(() => {
-                      // Excluir entradas temporales del total general
-                      const realEntries = timeEntries.filter(entry => 
+                      const realEntries = timeEntries.filter(entry =>
                         !(entry.id && entry.id.toString().startsWith('temp-'))
                       );
-                      const total = realEntries.reduce((sum, entry) => sum + (parseFloat(entry.hours) || 0), 0);
-                      console.log('[TimesheetMatrix] Calculating total:', realEntries.length, 'real entries (excluding temps), total:', total);
-                      return total.toFixed(2);
+                      return realEntries.reduce((sum, entry) => sum + (parseFloat(entry.hours) || 0), 0).toFixed(2);
                     })()}
                   </td>
                 </tr>
@@ -955,9 +995,27 @@ const TimesheetMatrix = () => {
           </table>
         </div>
 
-        <div className="mt-4 text-sm text-gray-500">
-          <p>💡 Los cambios se guardan automáticamente después de 1 segundo</p>
+        <div className="mt-4 text-sm text-gray-500 space-y-2">
+          <p>💡 Los cambios se guardan automáticamente después de 2 segundos</p>
           <p>🟡 Guardando | 🟢 Guardado | 🔴 Error</p>
+
+          {/* Información sobre restricciones de fecha */}
+          {dateRestrictions.enabled && (
+            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <h4 className="font-medium text-blue-800 mb-2">📅 Restricciones de Fecha Activas</h4>
+              <div className="text-xs text-blue-700 space-y-1">
+                <p>• Días pasados permitidos: <strong>{dateRestrictions.pastDaysAllowed}</strong></p>
+                <p>• Días futuros permitidos: <strong>{dateRestrictions.futureDaysAllowed}</strong></p>
+                <p>• Las fechas restringidas aparecen con fondo rojizo y están deshabilitadas</p>
+              </div>
+            </div>
+          )}
+
+          {!dateRestrictions.enabled && (
+            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-xs text-green-700">🔓 Sin restricciones de fecha - Puede capturar tiempo en cualquier fecha</p>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

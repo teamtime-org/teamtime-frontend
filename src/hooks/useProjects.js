@@ -133,12 +133,20 @@ export const useAllProjects = () => {
       setLoading(true);
       setError(null);
       
+      // Por defecto filtrar solo proyectos activos para timesheet
+      const defaultParams = { 
+        status: 'ACTIVE',
+        ...params // Permitir sobrescribir con parámetros específicos
+      };
+      
+      console.log('[useAllProjects] Fetching projects with params:', defaultParams);
+      
       // Primero obtenemos el total para saber cuántos proyectos hay
-      const initialResponse = await projectService.getAll({ ...params, limit: 1 });
+      const initialResponse = await projectService.getAll({ ...defaultParams, limit: 1 });
       const total = initialResponse.data?.total || 0;
       
       // Luego cargamos todos los proyectos usando el total como límite
-      const queryParams = { ...params, limit: Math.max(total, 1000) };
+      const queryParams = { ...defaultParams, limit: Math.max(total, 1000) };
       const response = await projectService.getAll(queryParams);
 
       setProjects(response.data?.projects || []);
@@ -172,12 +180,15 @@ export const useAssignedProjects = () => {
       setLoading(true);
       setError(null);
       
-      // Filtrar por proyectos asignados al usuario actual
+      // Filtrar por proyectos asignados al usuario actual y solo activos por defecto
       const queryParams = { 
-        ...params, 
+        status: 'ACTIVE', // Por defecto solo proyectos activos
         assigned: true, // Flag para filtrar por asignaciones
-        limit: 1000 
+        limit: 1000,
+        ...params // Permitir sobrescribir con parámetros específicos
       };
+      
+      console.log('[useAssignedProjects] Fetching projects with params:', queryParams);
       const response = await projectService.getAll(queryParams);
 
       setProjects(response.data?.projects || []);

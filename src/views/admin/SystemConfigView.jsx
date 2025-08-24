@@ -10,6 +10,11 @@ const SystemConfigView = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [futureDays, setFutureDays] = useState(7);
+  const [dateRestrictions, setDateRestrictions] = useState({
+    enabled: true,
+    futureDaysAllowed: 7,
+    pastDaysAllowed: 30
+  });
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
 
@@ -29,6 +34,7 @@ const SystemConfigView = () => {
   useEffect(() => {
     loadConfigs();
     loadFutureDaysConfig();
+    loadDateRestrictionConfigs();
   }, []);
 
   const loadConfigs = async () => {
@@ -50,6 +56,19 @@ const SystemConfigView = () => {
       setFutureDays(response.data?.futureDaysAllowed || 7);
     } catch (error) {
       console.error('Error al cargar configuración de días futuros:', error);
+    }
+  };
+
+  const loadDateRestrictionConfigs = async () => {
+    try {
+      const response = await systemConfigService.getDateRestrictionConfigs();
+      setDateRestrictions(response.data || {
+        enabled: true,
+        futureDaysAllowed: 7,
+        pastDaysAllowed: 30
+      });
+    } catch (error) {
+      console.error('Error al cargar configuraciones de restricción de fecha:', error);
     }
   };
 
@@ -83,6 +102,38 @@ const SystemConfigView = () => {
     }
   };
 
+  const handleSaveDateRestrictions = async () => {
+    try {
+      setSaving(true);
+      
+      // Validaciones
+      if (dateRestrictions.enabled) {
+        const futureDays = parseInt(dateRestrictions.futureDaysAllowed, 10);
+        const pastDays = parseInt(dateRestrictions.pastDaysAllowed, 10);
+        
+        if (isNaN(futureDays) || futureDays < 0 || futureDays > 365) {
+          showMessage('Los días futuros deben estar entre 0 y 365', 'error');
+          return;
+        }
+        
+        if (isNaN(pastDays) || pastDays < 0 || pastDays > 365) {
+          showMessage('Los días pasados deben estar entre 0 y 365', 'error');
+          return;
+        }
+      }
+
+      await systemConfigService.setDateRestrictionConfigs(dateRestrictions);
+      showMessage('Configuraciones de restricción de fecha actualizadas correctamente');
+      await loadConfigs(); // Recargar todas las configuraciones
+      await loadDateRestrictionConfigs();
+    } catch (error) {
+      console.error('Error al guardar configuraciones:', error);
+      showMessage('Error al guardar configuraciones', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleInitializeDefaults = async () => {
     try {
       setSaving(true);
@@ -90,6 +141,7 @@ const SystemConfigView = () => {
       showMessage('Configuraciones por defecto inicializadas correctamente');
       await loadConfigs();
       await loadFutureDaysConfig();
+      await loadDateRestrictionConfigs();
     } catch (error) {
       console.error('Error al inicializar configuraciones:', error);
       showMessage('Error al inicializar configuraciones por defecto', 'error');
@@ -102,10 +154,14 @@ const SystemConfigView = () => {
     switch (key) {
       case 'TIME_ENTRY_FUTURE_DAYS':
         return `${value} día${value !== '1' ? 's' : ''}`;
+      case 'TIME_ENTRY_PAST_DAYS':
+        return `${value} día${value !== '1' ? 's' : ''}`;
       case 'TIME_ENTRY_MAX_HOURS_PER_DAY':
         return `${value} hora${value !== '1' ? 's' : ''}`;
       case 'TIME_ENTRY_MIN_HOURS':
         return `${value} hora${value !== '1' ? 's' : ''}`;
+      case 'TIME_ENTRY_DATE_RESTRICTIONS_ENABLED':
+        return value === 'true' ? 'Habilitado' : 'Deshabilitado';
       default:
         return value;
     }
@@ -114,7 +170,10 @@ const SystemConfigView = () => {
   const getConfigIcon = (key) => {
     switch (key) {
       case 'TIME_ENTRY_FUTURE_DAYS':
+      case 'TIME_ENTRY_PAST_DAYS':
         return <Calendar className="w-5 h-5 text-blue-600" />;
+      case 'TIME_ENTRY_DATE_RESTRICTIONS_ENABLED':
+        return <AlertTriangle className="w-5 h-5 text-orange-600" />;
       case 'TIME_ENTRY_MAX_HOURS_PER_DAY':
       case 'TIME_ENTRY_MIN_HOURS':
         return <Clock className="w-5 h-5 text-green-600" />;
@@ -126,6 +185,8 @@ const SystemConfigView = () => {
   const getConfigName = (key) => {
     const names = {
       'TIME_ENTRY_FUTURE_DAYS': 'Días futuros permitidos',
+      'TIME_ENTRY_PAST_DAYS': 'Días pasados permitidos',
+      'TIME_ENTRY_DATE_RESTRICTIONS_ENABLED': 'Restricciones de fecha',
       'TIME_ENTRY_MAX_HOURS_PER_DAY': 'Máximo horas por día',
       'TIME_ENTRY_MIN_HOURS': 'Mínimo horas por entrada'
     };
@@ -166,15 +227,110 @@ const SystemConfigView = () => {
         </div>
       )}
 
-      {/* Configuración Principal: Días Futuros */}
+      {/* Configuración Principal: Restricciones de Fecha */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Calendar className="w-5 h-5 text-blue-600" />
-            <span>Configuración de Fechas Futuras</span>
+            <span>Configuración de Restricciones de Fecha</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Control principal para habilitar/deshabilitar restricciones */}
+          <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg">
+            <div className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                id="enableRestrictions"
+                checked={dateRestrictions.enabled}
+                onChange={(e) => setDateRestrictions(prev => ({ ...prev, enabled: e.target.checked }))}
+                className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="enableRestrictions" className="text-lg font-medium text-gray-900">
+                Habilitar restricciones de fecha para timesheet
+              </label>
+            </div>
+            <p className="text-sm text-gray-600 mt-2 ml-8">
+              {dateRestrictions.enabled 
+                ? 'Los usuarios solo podrán capturar tiempo dentro de los rangos configurados'
+                : 'Los usuarios podrán capturar tiempo en cualquier fecha (sin restricciones)'
+              }
+            </p>
+          </div>
+
+          {/* Configuraciones de días permitidos - solo si están habilitadas las restricciones */}
+          {dateRestrictions.enabled && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Días en el futuro permitidos
+                </label>
+                <div className="flex items-center space-x-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={dateRestrictions.futureDaysAllowed}
+                    onChange={(e) => setDateRestrictions(prev => ({ ...prev, futureDaysAllowed: parseInt(e.target.value) || 0 }))}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-gray-600">días</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  0 = solo fechas pasadas y hoy. Recomendado: 7 días.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Días en el pasado permitidos
+                </label>
+                <div className="flex items-center space-x-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={dateRestrictions.pastDaysAllowed}
+                    onChange={(e) => setDateRestrictions(prev => ({ ...prev, pastDaysAllowed: parseInt(e.target.value) || 0 }))}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-gray-600">días</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Cuántos días hacia atrás. Recomendado: 30 días.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Botón guardar */}
+          <div className="flex justify-end">
+            <Button
+              onClick={handleSaveDateRestrictions}
+              disabled={saving}
+              className="flex items-center space-x-2"
+            >
+              <Save className="w-4 h-4" />
+              <span>Guardar Configuración</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Configuración Legada: Días Futuros (mantener por compatibilidad) */}
+      <Card className="bg-yellow-50 border-yellow-200">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2 text-yellow-800">
+            <Calendar className="w-5 h-5 text-yellow-600" />
+            <span>Configuración Legada - Días Futuros</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="p-3 bg-yellow-100 border border-yellow-300 rounded-lg">
+            <p className="text-sm text-yellow-700 mb-2">
+              📝 <strong>Nota:</strong> Esta configuración está obsoleta. Use la configuración de restricciones de fecha arriba.
+            </p>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Días en el futuro permitidos para registro de tiempo
@@ -193,16 +349,13 @@ const SystemConfigView = () => {
               <Button
                 onClick={handleSaveFutureDays}
                 disabled={saving}
+                variant="outline"
                 className="flex items-center space-x-2"
               >
                 <Save className="w-4 h-4" />
                 <span>Guardar</span>
               </Button>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Configura cuántos días en el futuro pueden los usuarios registrar tiempo. 
-              Recomendado: 7 días para planificación semanal.
-            </p>
           </div>
         </CardContent>
       </Card>
@@ -265,18 +418,41 @@ const SystemConfigView = () => {
           <CardTitle className="text-blue-800">Información Importante</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-blue-700 space-y-2">
-          <p>
-            • Los cambios en la configuración de días futuros afectan inmediatamente a todos los usuarios.
-          </p>
-          <p>
-            • Un valor de 0 días significa que solo se puede registrar tiempo para fechas pasadas y el día actual.
-          </p>
-          <p>
-            • Un valor de 7 días permite planificación semanal hacia adelante.
-          </p>
-          <p>
-            • Los valores recomendados son entre 1 y 14 días para la mayoría de organizaciones.
-          </p>
+          <div className="mb-4">
+            <h4 className="font-semibold text-blue-800 mb-2">Restricciones de Fecha:</h4>
+            <p>
+              • <strong>Deshabilitadas:</strong> Los usuarios pueden capturar tiempo en cualquier fecha (sin restricciones).
+            </p>
+            <p>
+              • <strong>Habilitadas:</strong> Los usuarios solo pueden capturar dentro de los rangos configurados.
+            </p>
+            <p>
+              • Los cambios afectan inmediatamente a todos los usuarios del sistema.
+            </p>
+          </div>
+          
+          <div className="mb-4">
+            <h4 className="font-semibold text-blue-800 mb-2">Configuración Recomendada:</h4>
+            <p>
+              • <strong>Días futuros:</strong> 7 días (permite planificación semanal).
+            </p>
+            <p>
+              • <strong>Días pasados:</strong> 30 días (permite correcciones mensuales).
+            </p>
+            <p>
+              • Para equipos ágiles, considere 0-3 días futuros y 7-14 días pasados.
+            </p>
+          </div>
+          
+          <div>
+            <h4 className="font-semibold text-blue-800 mb-2">Casos de Uso:</h4>
+            <p>
+              • <strong>Sin restricciones:</strong> Útil para migraciones de datos o correcciones históricas.
+            </p>
+            <p>
+              • <strong>Restricciones estrictas:</strong> Ideal para control riguroso y cumplimiento.
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
