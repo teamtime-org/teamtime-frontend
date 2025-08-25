@@ -1,6 +1,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
 import { UserProfile, UserStats, QuickActions } from '@/components/ui';
+import WorkloadDashboard from '@/components/dashboard/WorkloadDashboard';
 
 const DashboardView = () => {
   const { user } = useAuth();
@@ -38,6 +39,9 @@ const DashboardView = () => {
 
       {/* User Statistics */}
       <UserStats className="w-full" />
+      
+      {/* Workload Dashboard */}
+      <WorkloadDashboard />
     </div>
   );
 };
