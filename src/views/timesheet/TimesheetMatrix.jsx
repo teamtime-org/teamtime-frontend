@@ -272,10 +272,14 @@ const TimesheetMatrix = () => {
         userId: userId,
         startDate,
         endDate,
+        limit: 1000, // High limit to get all entries for the week
         _t: Date.now()
       });
 
       const entries = response.data?.timeEntries || response.timeEntries || [];
+      console.log('🔍 DEBUG: Time entries loaded:', entries);
+      console.log('🔍 DEBUG: Week start:', weekStart);
+      console.log('🔍 DEBUG: Week range:', formatDate(weekStart, 'yyyy-MM-dd'), 'to', endDate);
       setTimeEntries(entries);
     } catch (error) {
       console.error('Error al cargar entradas:', error);
@@ -339,10 +343,26 @@ const TimesheetMatrix = () => {
     
     const entry = timeEntries.find(entry => {
       const entryDateStr = normalizeDateString(entry.date);
-      return entry.taskId === taskId && entryDateStr === targetDateStr;
+      const match = entry.taskId === taskId && entryDateStr === targetDateStr;
+      if (taskId === "58e97240-2c8d-4f4d-92aa-d9417a9a6b32") {
+        console.log('🔍 DEBUG: Searching for task', taskId, 'on', targetDateStr, 'Date obj:', date);
+        console.log('🔍 DEBUG: Checking entry:', {
+          id: entry.id,
+          taskId: entry.taskId,
+          date: entry.date,
+          normalizedDate: entryDateStr,
+          hours: entry.hours,
+          match
+        });
+      }
+      return match;
     });
 
-    return entry ? (typeof entry.hours === 'string' ? entry.hours : String(entry.hours)) : '';
+    const result = entry ? (typeof entry.hours === 'string' ? entry.hours : String(entry.hours)) : '';
+    if (taskId === "58e97240-2c8d-4f4d-92aa-d9417a9a6b32") {
+      console.log('🔍 DEBUG: Final result for task', taskId, 'on', targetDateStr, ':', result);
+    }
+    return result;
   }, [timeEntries, normalizeDateString]);
 
   // Obtener ID de entrada para una tarea y día específico
