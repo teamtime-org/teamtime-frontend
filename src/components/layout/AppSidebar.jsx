@@ -9,6 +9,7 @@ import {
   Building,
   BarChart3,
   Settings,
+  Calendar,
   X
 } from 'lucide-react';
 import { cn } from '@/utils';
@@ -75,6 +76,7 @@ const SidebarContent = () => {
   const adminNavigation = [
     { name: t('users'), href: '/users', icon: Users },
     { name: t('areas'), href: '/areas', icon: Building },
+    { name: 'Períodos de Tiempo', href: '/admin/time-periods', icon: Calendar },
     { name: 'Configuración Sistema', href: '/admin/system-config', icon: Settings },
   ];
 

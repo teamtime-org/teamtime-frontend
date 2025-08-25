@@ -50,6 +50,8 @@ const TimesheetMatrix = () => {
   const [timeEntries, setTimeEntries] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saveIndicator, setSaveIndicator] = useState({});
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isErrorFading, setIsErrorFading] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
     status: 'ACTIVE', // Por defecto mostrar solo proyectos activos
@@ -277,9 +279,6 @@ const TimesheetMatrix = () => {
       });
 
       const entries = response.data?.timeEntries || response.timeEntries || [];
-      console.log('🔍 DEBUG: Time entries loaded:', entries);
-      console.log('🔍 DEBUG: Week start:', weekStart);
-      console.log('🔍 DEBUG: Week range:', formatDate(weekStart, 'yyyy-MM-dd'), 'to', endDate);
       setTimeEntries(entries);
     } catch (error) {
       console.error('Error al cargar entradas:', error);
@@ -343,26 +342,10 @@ const TimesheetMatrix = () => {
     
     const entry = timeEntries.find(entry => {
       const entryDateStr = normalizeDateString(entry.date);
-      const match = entry.taskId === taskId && entryDateStr === targetDateStr;
-      if (taskId === "58e97240-2c8d-4f4d-92aa-d9417a9a6b32") {
-        console.log('🔍 DEBUG: Searching for task', taskId, 'on', targetDateStr, 'Date obj:', date);
-        console.log('🔍 DEBUG: Checking entry:', {
-          id: entry.id,
-          taskId: entry.taskId,
-          date: entry.date,
-          normalizedDate: entryDateStr,
-          hours: entry.hours,
-          match
-        });
-      }
-      return match;
+      return entry.taskId === taskId && entryDateStr === targetDateStr;
     });
 
-    const result = entry ? (typeof entry.hours === 'string' ? entry.hours : String(entry.hours)) : '';
-    if (taskId === "58e97240-2c8d-4f4d-92aa-d9417a9a6b32") {
-      console.log('🔍 DEBUG: Final result for task', taskId, 'on', targetDateStr, ':', result);
-    }
-    return result;
+    return entry ? (typeof entry.hours === 'string' ? entry.hours : String(entry.hours)) : '';
   }, [timeEntries, normalizeDateString]);
 
   // Obtener ID de entrada para una tarea y día específico
@@ -464,7 +447,18 @@ const TimesheetMatrix = () => {
       }, 2000);
 
     } catch (error) {
-      console.error('Error al guardar entrada de tiempo:', error.response?.data?.message || error.message);
+      const errorMsg = error.response?.data?.message || error.message;
+      console.error('Error al guardar entrada de tiempo:', errorMsg);
+      
+      // Mostrar el mensaje de error al usuario
+      setErrorMessage(errorMsg);
+      setIsErrorFading(false);
+      
+      // Auto-cerrar después de 8 segundos
+      setTimeout(() => {
+        closeErrorToast();
+      }, 8000);
+      
       setSaveIndicator(prev => ({ ...prev, [key]: 'error' }));
 
       const waitTime = error.response?.status === 429 ? 5000 : 3000;
@@ -481,6 +475,15 @@ const TimesheetMatrix = () => {
       }, 1000);
     }
   }, [getEntryId, pendingRequests, userId, normalizeDateString]);
+
+  // Función para cerrar el toast con animación
+  const closeErrorToast = useCallback(() => {
+    setIsErrorFading(true);
+    setTimeout(() => {
+      setErrorMessage('');
+      setIsErrorFading(false);
+    }, 300); // Tiempo de la animación de salida
+  }, []);
 
   // Manejar cambio en input con debounce
   const handleHoursChange = useCallback((taskId, projectId, date, value) => {
@@ -863,15 +866,15 @@ const TimesheetMatrix = () => {
 
 
       <CardContent>
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[calc(100vh-300px)] relative">
           <table className="w-full border-collapse border border-gray-300">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="border border-gray-300 p-3 text-left font-medium min-w-[200px]">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-white shadow-sm">
+                <th className="border border-gray-300 p-3 text-left font-medium min-w-[200px] bg-white">
                   {t('projectTask')}
                 </th>
                 {weekDays.map((day, index) => (
-                  <th key={index} className="border border-gray-300 p-3 text-center font-medium w-24">
+                  <th key={index} className="border border-gray-300 p-3 text-center font-medium w-24 bg-white">
                     <div>
                       {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][index]}
                     </div>
@@ -880,7 +883,7 @@ const TimesheetMatrix = () => {
                     </div>
                   </th>
                 ))}
-                <th className="border border-gray-300 p-3 text-center font-medium w-20">
+                <th className="border border-gray-300 p-3 text-center font-medium w-20 bg-white">
                   {t('total')}
                 </th>
               </tr>
@@ -1018,6 +1021,36 @@ const TimesheetMatrix = () => {
         <div className="mt-4 text-sm text-gray-500 space-y-2">
           <p>💡 Los cambios se guardan automáticamente después de 2 segundos</p>
           <p>🟡 Guardando | 🟢 Guardado | 🔴 Error</p>
+
+          {/* Toast flotante de error */}
+          {errorMessage && (
+            <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md w-full mx-4 ${
+              isErrorFading ? 'animate-fade-out' : 'animate-bounce-in'
+            }`}>
+              <div className="bg-red-500 text-white px-6 py-4 rounded-lg shadow-lg border-l-4 border-red-600">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <span className="text-white text-lg">⚠️</span>
+                  </div>
+                  <div className="ml-3 flex-1">
+                    <h3 className="font-semibold text-white">Error al registrar tiempo</h3>
+                    <div className="mt-1 text-sm text-red-100">
+                      {errorMessage}
+                    </div>
+                  </div>
+                  <div className="ml-4 flex-shrink-0">
+                    <button
+                      onClick={closeErrorToast}
+                      className="text-red-200 hover:text-white transition-colors duration-200"
+                      title="Cerrar"
+                    >
+                      <span className="text-xl leading-none">×</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Información sobre restricciones de fecha */}
           {dateRestrictions.enabled && (

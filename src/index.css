@@ -62,4 +62,43 @@
   .table-row-hover:hover .sticky-column-right {
     background-color: #F9FAFB;
   }
+
+  /* Animaciones para toast flotante */
+  .animate-bounce-in {
+    animation: bounceIn 0.5s ease-out;
+  }
+
+  @keyframes bounceIn {
+    0% {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-100px) scale(0.3);
+    }
+    50% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(10px) scale(1.05);
+    }
+    70% {
+      transform: translateX(-50%) translateY(-5px) scale(0.9);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0) scale(1);
+    }
+  }
+
+  /* Animación de salida suave */
+  .animate-fade-out {
+    animation: fadeOut 0.3s ease-in forwards;
+  }
+
+  @keyframes fadeOut {
+    0% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0) scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-20px) scale(0.95);
+    }
+  }
 }

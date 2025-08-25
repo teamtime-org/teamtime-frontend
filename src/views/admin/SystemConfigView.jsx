@@ -15,6 +15,8 @@ const SystemConfigView = () => {
     futureDaysAllowed: 7,
     pastDaysAllowed: 30
   });
+  const [maxHoursPerDay, setMaxHoursPerDay] = useState(24);
+  const [minHoursPerEntry, setMinHoursPerEntry] = useState(0.25);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
 
@@ -35,6 +37,7 @@ const SystemConfigView = () => {
     loadConfigs();
     loadFutureDaysConfig();
     loadDateRestrictionConfigs();
+    loadHoursConfigs();
   }, []);
 
   const loadConfigs = async () => {
@@ -72,6 +75,25 @@ const SystemConfigView = () => {
     }
   };
 
+  const loadHoursConfigs = async () => {
+    try {
+      // Load max hours per day
+      const maxHoursResponse = await systemConfigService.getConfig('TIME_ENTRY_MAX_HOURS_PER_DAY');
+      if (maxHoursResponse?.data?.value) {
+        setMaxHoursPerDay(parseFloat(maxHoursResponse.data.value));
+      }
+      
+      // Load min hours per entry
+      const minHoursResponse = await systemConfigService.getConfig('TIME_ENTRY_MIN_HOURS');
+      if (minHoursResponse?.data?.value) {
+        setMinHoursPerEntry(parseFloat(minHoursResponse.data.value));
+      }
+    } catch (error) {
+      console.error('Error al cargar configuraciones de horas:', error);
+      // Si no existen las configuraciones, mantener los valores por defecto
+    }
+  };
+
   const showMessage = (text, type = 'success') => {
     setMessage(text);
     setMessageType(type);
@@ -85,7 +107,7 @@ const SystemConfigView = () => {
     try {
       setSaving(true);
       const days = parseInt(futureDays, 10);
-      
+
       if (isNaN(days) || days < 0 || days > 365) {
         showMessage('El número de días debe estar entre 0 y 365', 'error');
         return;
@@ -105,17 +127,17 @@ const SystemConfigView = () => {
   const handleSaveDateRestrictions = async () => {
     try {
       setSaving(true);
-      
+
       // Validaciones
       if (dateRestrictions.enabled) {
         const futureDays = parseInt(dateRestrictions.futureDaysAllowed, 10);
         const pastDays = parseInt(dateRestrictions.pastDaysAllowed, 10);
-        
+
         if (isNaN(futureDays) || futureDays < 0 || futureDays > 365) {
           showMessage('Los días futuros deben estar entre 0 y 365', 'error');
           return;
         }
-        
+
         if (isNaN(pastDays) || pastDays < 0 || pastDays > 365) {
           showMessage('Los días pasados deben estar entre 0 y 365', 'error');
           return;
@@ -134,6 +156,49 @@ const SystemConfigView = () => {
     }
   };
 
+  const handleSaveHoursConfig = async () => {
+    try {
+      setSaving(true);
+
+      // Validaciones
+      const maxHours = parseFloat(maxHoursPerDay);
+      const minHours = parseFloat(minHoursPerEntry);
+
+      if (isNaN(maxHours) || maxHours < 1 || maxHours > 24) {
+        showMessage('El máximo de horas por día debe estar entre 1 y 24', 'error');
+        return;
+      }
+
+      if (isNaN(minHours) || minHours < 0.25 || minHours > maxHours) {
+        showMessage(`El mínimo de horas debe estar entre 0.25 y ${maxHours}`, 'error');
+        return;
+      }
+
+      // Save max hours per day
+      await systemConfigService.setConfig({
+        key: 'TIME_ENTRY_MAX_HOURS_PER_DAY',
+        value: maxHours.toString(),
+        description: 'Máximo de horas permitidas por día'
+      });
+      
+      // Save min hours per entry
+      await systemConfigService.setConfig({
+        key: 'TIME_ENTRY_MIN_HOURS',
+        value: minHours.toString(),
+        description: 'Mínimo de horas por entrada de tiempo'
+      });
+
+      showMessage('Configuración de horas actualizada correctamente');
+      await loadConfigs(); // Recargar todas las configuraciones
+      await loadHoursConfigs();
+    } catch (error) {
+      console.error('Error al guardar configuración de horas:', error);
+      showMessage('Error al guardar configuración de horas', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleInitializeDefaults = async () => {
     try {
       setSaving(true);
@@ -142,6 +207,7 @@ const SystemConfigView = () => {
       await loadConfigs();
       await loadFutureDaysConfig();
       await loadDateRestrictionConfigs();
+      await loadHoursConfigs();
     } catch (error) {
       console.error('Error al inicializar configuraciones:', error);
       showMessage('Error al inicializar configuraciones por defecto', 'error');
@@ -218,11 +284,10 @@ const SystemConfigView = () => {
       </div>
 
       {message && (
-        <div className={`p-4 rounded-lg ${
-          messageType === 'error' 
-            ? 'bg-red-50 text-red-700 border border-red-200' 
+        <div className={`p-4 rounded-lg ${messageType === 'error'
+            ? 'bg-red-50 text-red-700 border border-red-200'
             : 'bg-green-50 text-green-700 border border-green-200'
-        }`}>
+          }`}>
           {message}
         </div>
       )}
@@ -251,7 +316,7 @@ const SystemConfigView = () => {
               </label>
             </div>
             <p className="text-sm text-gray-600 mt-2 ml-8">
-              {dateRestrictions.enabled 
+              {dateRestrictions.enabled
                 ? 'Los usuarios solo podrán capturar tiempo dentro de los rangos configurados'
                 : 'Los usuarios podrán capturar tiempo en cualquier fecha (sin restricciones)'
               }
@@ -317,45 +382,65 @@ const SystemConfigView = () => {
         </CardContent>
       </Card>
 
-      {/* Configuración Legada: Días Futuros (mantener por compatibilidad) */}
-      <Card className="bg-yellow-50 border-yellow-200">
+      {/* Configuración de Horas */}
+      <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-yellow-800">
-            <Calendar className="w-5 h-5 text-yellow-600" />
-            <span>Configuración Legada - Días Futuros</span>
+          <CardTitle className="flex items-center space-x-2">
+            <Clock className="w-5 h-5 text-green-600" />
+            <span>Configuración de Horas</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="p-3 bg-yellow-100 border border-yellow-300 rounded-lg">
-            <p className="text-sm text-yellow-700 mb-2">
-              📝 <strong>Nota:</strong> Esta configuración está obsoleta. Use la configuración de restricciones de fecha arriba.
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Días en el futuro permitidos para registro de tiempo
-            </label>
-            <div className="flex items-center space-x-4">
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-2 gap-6">
+            {/* Máximo de horas por día */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Máximo de horas por día
+              </label>
               <Input
                 type="number"
-                min="0"
-                max="365"
-                value={futureDays}
-                onChange={(e) => setFutureDays(e.target.value)}
-                className="w-32"
-                placeholder="7"
+                min="1"
+                max="24"
+                step="1"
+                value={maxHoursPerDay}
+                onChange={(e) => setMaxHoursPerDay(e.target.value)}
+                className="w-full"
               />
-              <span className="text-sm text-gray-600">días</span>
-              <Button
-                onClick={handleSaveFutureDays}
-                disabled={saving}
-                variant="outline"
-                className="flex items-center space-x-2"
-              >
-                <Save className="w-4 h-4" />
-                <span>Guardar</span>
-              </Button>
+              <p className="text-sm text-gray-500 mt-1">
+                Límite máximo de horas que un usuario puede registrar por día (1-24 horas)
+              </p>
             </div>
+
+            {/* Mínimo de horas por entrada */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Mínimo de horas por entrada
+              </label>
+              <Input
+                type="number"
+                min="0.25"
+                max={maxHoursPerDay}
+                step="0.25"
+                value={minHoursPerEntry}
+                onChange={(e) => setMinHoursPerEntry(e.target.value)}
+                className="w-full"
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                Mínimo de horas permitidas por entrada de tiempo (0.25 = 15 minutos)
+              </p>
+            </div>
+          </div>
+
+          {/* Botón guardar */}
+          <div className="flex justify-end">
+            <Button
+              onClick={handleSaveHoursConfig}
+              disabled={saving}
+              className="flex items-center space-x-2"
+            >
+              <Save className="w-4 h-4" />
+              <span>Guardar Configuración de Horas</span>
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -373,7 +458,7 @@ const SystemConfigView = () => {
             <div className="text-center py-8 text-gray-500">
               <Settings className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <p>No hay configuraciones disponibles</p>
-              <Button 
+              <Button
                 onClick={handleInitializeDefaults}
                 className="mt-4"
                 variant="outline"
@@ -430,7 +515,7 @@ const SystemConfigView = () => {
               • Los cambios afectan inmediatamente a todos los usuarios del sistema.
             </p>
           </div>
-          
+
           <div className="mb-4">
             <h4 className="font-semibold text-blue-800 mb-2">Configuración Recomendada:</h4>
             <p>
@@ -443,7 +528,7 @@ const SystemConfigView = () => {
               • Para equipos ágiles, considere 0-3 días futuros y 7-14 días pasados.
             </p>
           </div>
-          
+
           <div>
             <h4 className="font-semibold text-blue-800 mb-2">Casos de Uso:</h4>
             <p>
