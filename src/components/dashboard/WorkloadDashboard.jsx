@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js';
-import { Doughnut, Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
+import { Bar } from 'react-chartjs-2';
 import { timePeriodService } from '@/services/timePeriodService';
 import { timesheetService } from '@/services/timesheetService';
 import userService from '@/services/userService';
 import { useAuth } from '@/hooks/useAuth';
 import { CalendarDays, TrendingUp, Users, Clock, X, ChevronDown, UserCheck } from 'lucide-react';
+import GaugeChart from '@/components/ui/GaugeChart';
 
-ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 const WorkloadDashboard = () => {
   const { user } = useAuth();
@@ -160,65 +161,38 @@ const WorkloadDashboard = () => {
     }
   };
 
-  // Configuración del gráfico gauge (doughnut modificado) para comparación
-  const chartData = useMemo(() => {
+  // Calcular datos para el gauge
+  const gaugeData = useMemo(() => {
     if (workloadData.length === 0) return null;
-
-    // Si hay un solo período seleccionado
+    
     if (workloadData.length === 1) {
-      const percentage = workloadData[0].percentage || 0;
-      const remaining = Math.max(0, 100 - percentage);
-
+      const data = workloadData[0];
+      const percentage = data.percentage || 0;
       return {
-        labels: ['Carga de trabajo', 'Disponible'],
-        datasets: [{
-          data: [percentage, remaining],
-          backgroundColor: [
-            percentage >= 100 ? '#ef4444' : // Rojo si está sobrecargado
-            percentage >= 80 ? '#f59e0b' :  // Amarillo si está cerca del límite
-            '#10b981', // Verde si está bien
-            '#f3f4f6'  // Gris para el resto
-          ],
-          borderWidth: 0,
-          cutout: '75%',
-        }],
+        value: percentage,
+        horasPMO: data.horasPMO || 0,
+        horasCliente: data.horasCliente || 0,
+        horasReferencia: data.referenceHours || 0,
+        period: data.period
       };
     }
-
-    // Si hay dos períodos para comparar
+    
+    // Para múltiples períodos, mostrar el promedio
+    const totalActual = workloadData.reduce((sum, data) => sum + Number(data.actualHours || 0), 0);
+    const totalReferencia = workloadData.reduce((sum, data) => sum + Number(data.referenceHours || 0), 0);
+    const totalPMO = workloadData.reduce((sum, data) => sum + Number(data.horasPMO || 0), 0);
+    const totalCliente = workloadData.reduce((sum, data) => sum + Number(data.horasCliente || 0), 0);
+    const averagePercentage = totalReferencia > 0 ? (totalActual / totalReferencia) * 100 : 0;
+    
     return {
-      labels: ['Carga de trabajo', 'Disponible'],
-      datasets: workloadData.map((data, index) => ({
-        label: data.period?.description || `Período ${index + 1}`,
-        data: [data.percentage || 0, Math.max(0, 100 - (data.percentage || 0))],
-        backgroundColor: [
-          index === 0 ? '#3b82f6' : '#8b5cf6', // Azul y púrpura para diferenciar
-          '#f3f4f6'
-        ],
-        borderWidth: 0,
-        cutout: index === 0 ? '75%' : '60%',
-      })),
+      value: averagePercentage,
+      horasPMO: totalPMO,
+      horasCliente: totalCliente,
+      horasReferencia: totalReferencia,
+      isComparison: true
     };
   }, [workloadData]);
 
-  const chartOptions = {
-    plugins: {
-      legend: {
-        display: false,
-      },
-      tooltip: {
-        callbacks: {
-          label: function(context) {
-            if (context.dataIndex === 0) {
-              return `Carga de trabajo: ${context.parsed}%`;
-            }
-            return '';
-          }
-        }
-      }
-    },
-    maintainAspectRatio: false,
-  };
 
   const getStatusColor = (percentage) => {
     if (percentage >= 100) return 'text-red-600';
@@ -349,95 +323,152 @@ const WorkloadDashboard = () => {
           </div>
         </div>
 
-        {workloadData.length > 0 && chartData && (
+        {workloadData.length > 0 && gaugeData && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Gráfico gauge */}
-            <div className="relative">
-              <div className="h-64 relative">
-                <Doughnut data={chartData} options={chartOptions} />
-                {/* Texto central del gauge */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  {workloadData.length === 1 ? (
-                    <>
-                      <div className={`text-3xl font-bold ${getStatusColor(workloadData[0].percentage || 0)}`}>
-                        {Math.round(workloadData[0].percentage || 0)}%
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {getStatusText(workloadData[0].percentage || 0)}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-center">
-                      <div className="text-sm text-gray-600">Comparación</div>
-                      {workloadData.map((data, idx) => (
-                        <div key={idx} className="text-xs mt-1">
-                          <span className={idx === 0 ? 'text-blue-600' : 'text-purple-600'}>
-                            P{idx+1}: {Math.round(data.percentage || 0)}%
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+            {/* Medidor Gauge */}
+            <div className="flex justify-center">
+              <GaugeChart
+                value={gaugeData.value}
+                title={gaugeData.isComparison ? "PROMEDIO CARGA LABORAL" : "PORCENTAJE DE CARGA LABORAL"}
+                horasPMO={gaugeData.horasPMO}
+                horasCliente={gaugeData.horasCliente}
+                horasReferencia={gaugeData.horasReferencia}
+                className="w-full"
+              />
             </div>
 
-            {/* Estadísticas detalladas */}
+            {/* Estadísticas detalladas por período */}
             <div className="space-y-4">
+              <h4 className="text-md font-semibold text-gray-900 mb-3">
+                Detalles por Período
+              </h4>
               {workloadData.map((data, index) => (
-                <div key={index} className="space-y-3">
-                  {workloadData.length > 1 && (
-                    <div className="font-medium text-sm text-gray-700 border-b pb-1">
-                      Período {index + 1}: {formatDate(data.period?.startDate)} - {formatDate(data.period?.endDate)}
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="flex items-center">
-                        <Clock className="h-4 w-4 text-blue-500 mr-2" />
-                        <div>
-                          <p className="text-xs text-gray-600">Horas Trabajadas</p>
-                          <p className="text-lg font-semibold text-gray-900">
-                            {data.actualHours || 0}h
-                          </p>
-                        </div>
+                <div key={index} className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  <div className="font-medium text-sm text-gray-700 border-b border-gray-200 pb-2">
+                    {workloadData.length > 1 ? `Período ${index + 1}: ` : ''}
+                    {formatDate(data.period?.startDate)} - {formatDate(data.period?.endDate)}
+                  </div>
+                  
+                  {/* Clasificación de horas */}
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div className="bg-blue-50 rounded-lg p-3 text-center">
+                      <div className="flex items-center justify-center mb-1">
+                        <Users className="h-4 w-4 text-blue-600 mr-1" />
                       </div>
+                      <p className="text-xs text-blue-700 font-medium">Horas PMO</p>
+                      <p className="text-lg font-semibold text-blue-900">
+                        {Number(data.horasPMO || 0).toFixed(1)}h
+                      </p>
+                      <p className="text-xs text-blue-600">
+                        ({data.referenceHours > 0 ? ((Number(data.horasPMO || 0) / Number(data.referenceHours)) * 100).toFixed(1) : '0.0'}%)
+                      </p>
                     </div>
 
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="flex items-center">
-                        <TrendingUp className="h-4 w-4 text-green-500 mr-2" />
-                        <div>
-                          <p className="text-xs text-gray-600">Horas Referencia</p>
-                          <p className="text-lg font-semibold text-gray-900">
-                            {data.referenceHours || 0}h
-                          </p>
-                        </div>
+                    <div className="bg-green-50 rounded-lg p-3 text-center">
+                      <div className="flex items-center justify-center mb-1">
+                        <Clock className="h-4 w-4 text-green-600 mr-1" />
                       </div>
+                      <p className="text-xs text-green-700 font-medium">Horas Cliente</p>
+                      <p className="text-lg font-semibold text-green-900">
+                        {Number(data.horasCliente || 0).toFixed(1)}h
+                      </p>
+                      <p className="text-xs text-green-600">
+                        ({data.referenceHours > 0 ? ((Number(data.horasCliente || 0) / Number(data.referenceHours)) * 100).toFixed(1) : '0.0'}%)
+                      </p>
                     </div>
                   </div>
 
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-gray-600">Diferencia</p>
-                        <p className={`text-base font-semibold ${
-                          (data.difference || 0) >= 0 ? 'text-red-600' : 'text-green-600'
-                        }`}>
-                          {(data.difference || 0) >= 0 ? '+' : ''}
-                          {(data.difference || 0).toFixed(1)}h
-                        </p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="text-center">
+                      <div className="flex items-center justify-center mb-1">
+                        <Clock className="h-4 w-4 text-gray-500 mr-1" />
                       </div>
-                      <div className="text-right">
-                        <p className="text-xs text-gray-600">Estado</p>
-                        <p className={`text-sm font-medium ${getStatusColor(data.percentage || 0)}`}>
-                          {getStatusText(data.percentage || 0)}
-                        </p>
+                      <p className="text-xs text-gray-600">Total Trabajadas</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {Number(data.actualHours || 0).toFixed(1)}h
+                      </p>
+                    </div>
+
+                    <div className="text-center">
+                      <div className="flex items-center justify-center mb-1">
+                        <TrendingUp className="h-4 w-4 text-gray-500 mr-1" />
                       </div>
+                      <p className="text-xs text-gray-600">Referencia</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {Number(data.referenceHours || 0).toFixed(1)}h
+                      </p>
+                    </div>
+
+                    <div className="text-center">
+                      <p className="text-xs text-gray-600 mb-1">Porcentaje</p>
+                      <p className={`text-lg font-semibold ${
+                        getStatusColor(data.percentage || 0)
+                      }`}>
+                        {Math.round(data.percentage || 0)}%
+                      </p>
+                      <p className={`text-xs font-medium ${getStatusColor(data.percentage || 0)}`}>
+                        {getStatusText(data.percentage || 0)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-200 pt-2">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600">Diferencia:</span>
+                      <span className={`font-semibold ${
+                        (data.difference || 0) >= 0 ? 'text-red-600' : 'text-green-600'
+                      }`}>
+                        {Number(data.difference || 0) >= 0 ? '+' : ''}
+                        {Number(data.difference || 0).toFixed(1)}h
+                      </span>
                     </div>
                   </div>
                 </div>
               ))}
+              
+              {/* Resumen cuando hay múltiples períodos */}
+              {workloadData.length > 1 && (
+                <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
+                  <h5 className="font-semibold text-indigo-900 mb-3">Resumen Total</h5>
+                  
+                  {/* Clasificación PMO vs Cliente */}
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div className="bg-blue-100 rounded-lg p-2 text-center">
+                      <p className="text-xs text-blue-700 font-medium">Total PMO</p>
+                      <p className="text-lg font-bold text-blue-900">
+                        {workloadData.reduce((sum, data) => sum + Number(data.horasPMO || 0), 0).toFixed(1)}h
+                      </p>
+                    </div>
+                    <div className="bg-green-100 rounded-lg p-2 text-center">
+                      <p className="text-xs text-green-700 font-medium">Total Cliente</p>
+                      <p className="text-lg font-bold text-green-900">
+                        {workloadData.reduce((sum, data) => sum + Number(data.horasCliente || 0), 0).toFixed(1)}h
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-3 text-center text-sm">
+                    <div>
+                      <p className="text-indigo-700">Total Trabajadas</p>
+                      <p className="font-bold text-indigo-900">
+                        {workloadData.reduce((sum, data) => sum + Number(data.actualHours || 0), 0).toFixed(1)}h
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-indigo-700">Total Referencia</p>
+                      <p className="font-bold text-indigo-900">
+                        {workloadData.reduce((sum, data) => sum + Number(data.referenceHours || 0), 0).toFixed(1)}h
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-indigo-700">Promedio</p>
+                      <p className="font-bold text-indigo-900">
+                        {Math.round(gaugeData.value)}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -447,7 +478,7 @@ const WorkloadDashboard = () => {
           <div className="text-center py-12 text-gray-500">
             <CalendarDays className="h-12 w-12 mx-auto mb-3 text-gray-400" />
             <p className="text-lg font-medium">Selecciona un período para ver tu carga de trabajo</p>
-            <p className="text-sm mt-1">Puedes comparar hasta 2 períodos a la vez</p>
+            <p className="text-sm mt-1">El medidor mostrará tu porcentaje de carga laboral</p>
           </div>
         )}
       </div>

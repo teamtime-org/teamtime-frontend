@@ -9,5 +9,6 @@ export { default as UserSearchSelect } from './UserSearchSelect';
 export { default as UserProfile } from './UserProfile';
 export { default as UserStats } from './UserStats';
 export { default as QuickActions } from './QuickActions';
+export { default as GaugeChart } from './GaugeChart';
 export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent } from './Card';
 export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell } from './Table';
