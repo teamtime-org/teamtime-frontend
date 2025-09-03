@@ -21,8 +21,30 @@ export const useProjects = () => {
 
       setProjects(response.data?.projects || []);
       setPagination({
+        page: response.data?.page || params.page || 1,
+        limit: response.data?.limit || params.limit || 10,
+        total: response.data?.total || 0,
+        totalPages: response.data?.totalPages || Math.ceil((response.data?.total || 0) / (response.data?.limit || params.limit || 10)),
+      });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error loading projects');
+    } finally {
+      setLoading(false);
+    }
+  }, []); // Sin dependencias para evitar bucles infinitos
+
+  const fetchAllProjects = useCallback(async (params = {}) => {
+    try {
+      setLoading(true);
+      setError(null);
+      // Cargar todos los proyectos usando un límite alto
+      const queryParams = { ...params, limit: 1000 };
+      const response = await projectService.getAll(queryParams);
+
+      setProjects(response.data?.projects || []);
+      setPagination({
         page: response.data?.page || 1,
-        limit: response.data?.limit || 10,
+        limit: response.data?.limit || 1000,
         total: response.data?.total || 0,
         totalPages: response.data?.totalPages || 0,
       });
@@ -93,9 +115,99 @@ export const useProjects = () => {
     error,
     pagination,
     fetchProjects,
+    fetchAllProjects,
     createProject,
     updateProject,
     deleteProject,
+  };
+};
+
+// Hook para cargar todos los proyectos (usado en formularios)
+export const useAllProjects = () => {
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchAllProjects = useCallback(async (params = {}) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Por defecto filtrar solo proyectos activos para timesheet
+      const defaultParams = { 
+        status: 'ACTIVE',
+        ...params // Permitir sobrescribir con parámetros específicos
+      };
+      
+      console.log('[useAllProjects] Fetching projects with params:', defaultParams);
+      
+      // Primero obtenemos el total para saber cuántos proyectos hay
+      const initialResponse = await projectService.getAll({ ...defaultParams, limit: 1 });
+      const total = initialResponse.data?.total || 0;
+      
+      // Luego cargamos todos los proyectos usando el total como límite
+      const queryParams = { ...defaultParams, limit: Math.max(total, 1000) };
+      const response = await projectService.getAll(queryParams);
+
+      setProjects(response.data?.projects || []);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error loading projects');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAllProjects();
+  }, [fetchAllProjects]);
+
+  return {
+    projects,
+    loading,
+    error,
+    fetchAllProjects,
+  };
+};
+
+// Hook para cargar solo los proyectos asignados al usuario actual (para timesheet)
+export const useAssignedProjects = () => {
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchAssignedProjects = useCallback(async (params = {}) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Filtrar por proyectos asignados al usuario actual y solo activos por defecto
+      const queryParams = { 
+        status: 'ACTIVE', // Por defecto solo proyectos activos
+        assigned: true, // Flag para filtrar por asignaciones
+        limit: 1000,
+        ...params // Permitir sobrescribir con parámetros específicos
+      };
+      
+      console.log('[useAssignedProjects] Fetching projects with params:', queryParams);
+      const response = await projectService.getAll(queryParams);
+
+      setProjects(response.data?.projects || []);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error loading assigned projects');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAssignedProjects();
+  }, []); // Solo ejecutar una vez al montar
+
+  return {
+    projects,
+    loading,
+    error,
+    fetchAssignedProjects,
   };
 };
 

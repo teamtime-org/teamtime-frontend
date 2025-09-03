@@ -170,12 +170,19 @@ const ResponsiveProjectsTable = ({
                                         style={{ minWidth: '300px', maxWidth: '300px' }}
                                     >
                                         <div className="w-full">
-                                            <div
-                                                className="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 truncate block"
-                                                onClick={() => navigate(`/projects/${project.id}`)}
-                                                title={project.name}
-                                            >
-                                                {project.name}
+                                            <div className="flex items-center space-x-2">
+                                                <div
+                                                    className="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 truncate block flex-1"
+                                                    onClick={() => navigate(`/projects/${project.id}`)}
+                                                    title={project.name}
+                                                >
+                                                    {project.name}
+                                                </div>
+                                                {project.isGeneral && (
+                                                    <Badge variant="info" className="text-xs">
+                                                        General
+                                                    </Badge>
+                                                )}
                                             </div>
                                             {project.description && (
                                                 <div

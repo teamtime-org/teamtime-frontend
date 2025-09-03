@@ -49,9 +49,10 @@ export const useTimesheets = (initialParams = {}) => {
       await fetchTimesheets();
       return response.data;
     } catch (err) {
-      console.warn('Timesheet creation API not available');
-      setError('Backend not available - Timesheet creation disabled');
-      throw new Error('Backend not available');
+      console.error('Error creating timesheet:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Error creating timesheet';
+      setError(errorMessage);
+      throw err; // Lanzar el error original para que el componente pueda manejarlo
     } finally {
       setLoading(false);
     }
@@ -419,33 +420,17 @@ export const useTimesheetApprovals = () => {
   const [error, setError] = useState(null);
 
   const fetchPendingApprovals = useCallback(async (params = {}) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await timesheetService.getPendingApprovals(params);
-      setPendingApprovals(response.data?.approvals || []);
-    } catch (err) {
-      console.warn('Pending approvals API not available');
-      setPendingApprovals([]);
-      setError(null); // Don't show error for missing backend endpoints
-    } finally {
-      setLoading(false);
-    }
+    // API no implementada aún - retornar vacío sin hacer llamadas
+    console.debug('[useTimesheetApprovals] Pending approvals API not yet implemented - skipping call');
+    setPendingApprovals([]);
+    setError(null);
   }, []);
 
   const fetchTeamTimesheets = useCallback(async (params = {}) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await timesheetService.getTeamTimesheets(params);
-      setTeamTimesheets(response.data?.timesheets || []);
-    } catch (err) {
-      console.warn('Team timesheets API not available');
-      setTeamTimesheets([]);
-      setError(null); // Don't show error for missing backend endpoints
-    } finally {
-      setLoading(false);
-    }
+    // API no implementada aún - retornar vacío sin hacer llamadas
+    console.debug('[useTimesheetApprovals] Team timesheets API not yet implemented - skipping call');
+    setTeamTimesheets([]);
+    setError(null);
   }, []);
 
   const approveTimesheet = async (id, approvalData = {}) => {

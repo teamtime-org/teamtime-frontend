@@ -7,6 +7,7 @@ const AuthContext = createContext();
 const initialState = {
   user: null,
   token: null,
+  userId: null,
   isLoading: true,
   isAuthenticated: false,
 };
@@ -20,6 +21,7 @@ const authReducer = (state, action) => {
         ...state,
         user: action.payload.user,
         token: action.payload.token,
+        userId: action.payload.userId,
         isLoading: false,
         isAuthenticated: true,
       };
@@ -28,6 +30,7 @@ const authReducer = (state, action) => {
         ...state,
         user: null,
         token: null,
+        userId: null,
         isLoading: false,
         isAuthenticated: false,
       };
@@ -36,6 +39,7 @@ const authReducer = (state, action) => {
         ...state,
         user: null,
         token: null,
+        userId: null,
         isAuthenticated: false,
       };
     case 'UPDATE_USER':
@@ -64,7 +68,15 @@ export const AuthProvider = ({ children }) => {
         
         if (token && userData) {
           const user = JSON.parse(userData);
-          dispatch({ type: 'LOGIN_SUCCESS', payload: { token, user } });
+          // Decode JWT to get userId
+          try {
+            const tokenPayload = JSON.parse(atob(token.split('.')[1]));
+            dispatch({ type: 'LOGIN_SUCCESS', payload: { token, user, userId: tokenPayload.userId } });
+          } catch (error) {
+            console.error('Error decoding JWT token:', error);
+            // Fallback to user.id if JWT decoding fails
+            dispatch({ type: 'LOGIN_SUCCESS', payload: { token, user, userId: user.id } });
+          }
           
           // Note: Skip token verification for now since /auth/me endpoint is not implemented
           // In production, you would verify the token here
@@ -97,7 +109,15 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, response.data.token);
       localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(response.data.user));
       
-      dispatch({ type: 'LOGIN_SUCCESS', payload: response.data });
+      // Decode JWT to get userId
+      try {
+        const tokenPayload = JSON.parse(atob(response.data.token.split('.')[1]));
+        dispatch({ type: 'LOGIN_SUCCESS', payload: { ...response.data, userId: tokenPayload.userId } });
+      } catch (error) {
+        console.error('Error decoding JWT token during login:', error);
+        // Fallback to user.id if JWT decoding fails
+        dispatch({ type: 'LOGIN_SUCCESS', payload: { ...response.data, userId: response.data.user.id } });
+      }
       return response;
     } catch (error) {
       dispatch({ type: 'LOGIN_FAILURE' });

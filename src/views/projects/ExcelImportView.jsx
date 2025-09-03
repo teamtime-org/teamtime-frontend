@@ -24,7 +24,7 @@ import {
 } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
-import { ROLES } from '@/constants';
+import { ROLES, STANDARD_PROJECT_TASKS, GENERAL_PROJECT_TASKS, GENERAL_PROJECT_PREFIX } from '@/constants';
 import api from '@/services/api';
 import { areaService } from '@/services/areaService';
 
@@ -285,13 +285,46 @@ const ExcelImportView = () => {
             </div>
 
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <h4 className="font-medium text-green-900 mb-2">Campos Importantes</h4>
+              <h4 className="font-medium text-green-900 mb-2">Asignación de Usuarios</h4>
               <ul className="text-sm text-green-800 space-y-1">
-                <li>• <strong>Mentor:</strong> Usuario con rol colaborador (formato: "Nombre Apellido;#ID")</li>
-                <li>• <strong>Coordinador:</strong> Usuario con rol coordinador (formato: "Nombre Apellido;#ID")</li>
+                <li>• <strong>Mentor:</strong> Usuario colaborador asignado al proyecto (formato: "Nombre Apellido;#ID")</li>
+                <li>• <strong>Coordinador:</strong> Usuario coordinador asignado al proyecto (formato: "Nombre Apellido;#ID")</li>
+                <li>• <strong>Los usuarios se asignan al proyecto completo, no a tareas individuales</strong></li>
                 <li>• <strong>Riesgo:</strong> Valores permitidos: Bajo, Medio, Alto</li>
                 <li>• <strong>Proyecto Estratégico:</strong> SI/NO</li>
               </ul>
+            </div>
+
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <h4 className="font-medium text-purple-900 mb-2">Tareas Automáticas</h4>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-purple-800 mb-1">
+                    <strong>Actividades estándar por proyecto:</strong>
+                  </p>
+                  <p className="text-sm text-purple-700">
+                    {STANDARD_PROJECT_TASKS.join(', ')}
+                  </p>
+                </div>
+                
+                <div>
+                  <p className="text-sm font-medium text-purple-800 mb-1">
+                    <strong>Proyecto general del área:</strong>
+                  </p>
+                  <p className="text-sm text-purple-700 mb-1">
+                    "{GENERAL_PROJECT_PREFIX}: [Nombre del área]"
+                  </p>
+                  <p className="text-sm text-purple-700">
+                    <strong>Tareas:</strong> {GENERAL_PROJECT_TASKS.join(', ')}
+                  </p>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-purple-800">
+                    • <strong>Asignación automática:</strong> Todos los usuarios se asignarán al proyecto general de su área
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -300,6 +333,7 @@ const ExcelImportView = () => {
                 <li>• Los usuarios que no existan se crearán automáticamente</li>
                 <li>• Los catálogos (líneas de negocio, segmentos, etc.) se crearán si no existen</li>
                 <li>• Los proveedores se pueden listar separados por comas</li>
+                <li>• Los nuevos usuarios se asignarán automáticamente al proyecto general del área</li>
               </ul>
             </div>
           </div>

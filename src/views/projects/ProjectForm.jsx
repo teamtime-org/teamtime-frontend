@@ -31,6 +31,7 @@ const ProjectForm = ({ project, onSuccess, onCancel }) => {
       startDate: project?.startDate ? project.startDate.split('T')[0] : '',
       endDate: project?.endDate ? project.endDate.split('T')[0] : '',
       estimatedHours: project?.estimatedHours || '',
+      isGeneral: project?.isGeneral || false,
     },
   });
 
@@ -47,6 +48,7 @@ const ProjectForm = ({ project, onSuccess, onCancel }) => {
         startDate: project.startDate ? project.startDate.split('T')[0] : '',
         endDate: project.endDate ? project.endDate.split('T')[0] : '',
         estimatedHours: project.estimatedHours,
+        isGeneral: project.isGeneral || false,
       });
       setSelectedArea(project.areaId);
     }
@@ -59,10 +61,11 @@ const ProjectForm = ({ project, onSuccess, onCancel }) => {
         description: data.description,
         status: data.status,
         priority: data.priority,
-        estimatedHours: parseInt(data.estimatedHours) || 0,
+        estimatedHours: data.estimatedHours ? parseInt(data.estimatedHours) : null,
         startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
         endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
         areaId: selectedArea,
+        isGeneral: data.isGeneral || false,
       };
 
       if (project) {
@@ -83,9 +86,11 @@ const ProjectForm = ({ project, onSuccess, onCancel }) => {
   };
 
   const isAdmin = user?.role === ROLES.ADMIN;
+  const isCoordinator = user?.role === ROLES.MANAGER || user?.role === ROLES.COORDINADOR;
+  const canEditAllFields = isAdmin || isCoordinator;
 
-  // Managers can only create projects in their own area
-  const availableAreas = isAdmin ? areas : areas.filter(area => area.id === user?.areaId);
+  // Admins and coordinators can work with all areas, others only with their own area
+  const availableAreas = canEditAllFields ? areas : areas.filter(area => area.id === user?.areaId);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -180,17 +185,34 @@ const ProjectForm = ({ project, onSuccess, onCancel }) => {
           </select>
         </div>
 
+        <div className="md:col-span-2">
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="isGeneral"
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              {...register('isGeneral')}
+            />
+            <label htmlFor="isGeneral" className="text-sm font-medium text-gray-700">
+              {t('isGeneralProject')}
+            </label>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            {t('isGeneralProjectDescription')}
+          </p>
+        </div>
+
         <div>
           <Input
-            label={t('estimatedHours')}
+            label={`${t('estimatedHours')} (Opcional)`}
             type="number"
-            min="1"
+            min="0"
             placeholder={t('enterEstimatedHours')}
             error={errors.estimatedHours?.message}
             {...register('estimatedHours', {
               min: {
-                value: 1,
-                message: t('estimatedHoursMin'),
+                value: 0,
+                message: 'Las horas estimadas no pueden ser negativas',
               },
               max: {
                 value: 10000,

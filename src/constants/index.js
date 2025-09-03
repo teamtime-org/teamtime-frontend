@@ -76,3 +76,22 @@ export const PAGINATION = {
   DEFAULT_PAGE_SIZE: 10,
   PAGE_SIZE_OPTIONS: [10, 25, 50, 100],
 };
+
+export const STANDARD_PROJECT_TASKS = [
+  'Inicio',
+  'Planeación', 
+  'Ejecución',
+  'Monitoreo',
+  'Cierre'
+];
+
+export const GENERAL_PROJECT_TASKS = [
+  'Organización',
+  'Mejora continua',
+  'SmartCampus',
+  'Certificación',
+  'Mentoría',
+  'Preventa'
+];
+
+export const GENERAL_PROJECT_PREFIX = 'Actividades generales del área';

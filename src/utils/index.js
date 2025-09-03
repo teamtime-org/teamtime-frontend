@@ -156,3 +156,56 @@ export const copyToClipboard = async (text) => {
     return false;
   }
 };
+
+// Timezone-aware date utilities
+export const createDateWithTimezone = (date) => {
+  if (!date) return null;
+  
+  let dateObj;
+  if (date instanceof Date) {
+    dateObj = date;
+  } else if (typeof date === 'string') {
+    // Si es string en formato YYYY-MM-DD, interpretarlo como fecha local a medianoche
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const [year, month, day] = date.split('-');
+      dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), 12, 0, 0);
+    } else {
+      dateObj = new Date(date);
+    }
+  } else {
+    dateObj = new Date(date);
+  }
+  
+  if (isNaN(dateObj.getTime())) return null;
+  
+  // Crear fecha a mediodía para evitar problemas de timezone
+  const year = dateObj.getFullYear();
+  const month = dateObj.getMonth();
+  const day = dateObj.getDate();
+  
+  // Crear nueva fecha a mediodía en timezone local
+  const noonDate = new Date(year, month, day, 12, 0, 0);
+  
+  // Retornar ISO string
+  return noonDate.toISOString();
+};
+
+export const formatDateForAPI = (date) => {
+  if (!date) return '';
+  
+  let dateObj;
+  if (date instanceof Date) {
+    dateObj = date;
+  } else {
+    dateObj = new Date(date);
+  }
+  
+  if (isNaN(dateObj.getTime())) return '';
+  
+  // Return date in YYYY-MM-DD format using local timezone
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}`;
+};

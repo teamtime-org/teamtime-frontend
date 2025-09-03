@@ -14,6 +14,8 @@ import { TasksView, TaskDetailView } from '@/views/tasks';
 import { TimesheetView } from '@/views/timesheet';
 import ReportsView from '@/views/reports/ReportsView';
 import UsersView from '@/views/users/UsersView';
+import SystemConfigView from '@/views/admin/SystemConfigView';
+import TimePeriodsView from '@/views/admin/TimePeriodsView';
 import { ROLES } from '@/constants';
 
 function App() {
@@ -55,6 +57,16 @@ function App() {
               <Route path="areas" element={
                 <ProtectedRoute requiredRole={ROLES.ADMIN}>
                   <AreasView />
+                </ProtectedRoute>
+              } />
+              <Route path="admin/system-config" element={
+                <ProtectedRoute requiredRole={ROLES.ADMINISTRADOR}>
+                  <SystemConfigView />
+                </ProtectedRoute>
+              } />
+              <Route path="admin/time-periods" element={
+                <ProtectedRoute requiredRole={ROLES.ADMINISTRADOR}>
+                  <TimePeriodsView />
                 </ProtectedRoute>
               } />
             </Route>

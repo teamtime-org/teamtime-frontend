@@ -22,17 +22,17 @@ import {
   Input
 } from '@/components/ui';
 import { useWeeklyTimesheet } from '@/hooks/useTimesheets';
-import { useTasks } from '@/hooks/useTasks';
-import { useProjects } from '@/hooks/useProjects';
+import { useAssignedTasks } from '@/hooks/useTasks';
+import { useAssignedProjects } from '@/hooks/useProjects';
 import { useAuth } from '@/hooks/useAuth';
-import { formatDate, formatDuration } from '@/utils';
+import { formatDate, formatDuration, getWeekRange, getWeekDays } from '@/utils';
 import TimesheetForm from './TimesheetForm';
 
 const WeeklyTimesheetView = ({ weekStart: initialWeekStart, onWeekChange, onClose }) => {
   const { user } = useAuth();
   const [weekStart, setWeekStart] = useState(initialWeekStart || new Date());
-  const { projects } = useProjects();
-  const { tasks } = useTasks();
+  const { projects } = useAssignedProjects();
+  const { tasks } = useAssignedTasks();
   
   const { 
     timesheet, 
@@ -54,15 +54,7 @@ const WeeklyTimesheetView = ({ weekStart: initialWeekStart, onWeekChange, onClos
     setLocalEntries(timeEntries);
   }, [timeEntries]);
 
-  const getWeekDays = () => {
-    const days = [];
-    for (let i = 0; i < 7; i++) {
-      const day = new Date(weekStart);
-      day.setDate(day.getDate() + i);
-      days.push(day);
-    }
-    return days;
-  };
+  // Función para obtener los días de la semana usando las utilidades
 
   const navigateWeek = (direction) => {
     const newWeekStart = new Date(weekStart);
@@ -142,7 +134,7 @@ const WeeklyTimesheetView = ({ weekStart: initialWeekStart, onWeekChange, onClos
     }
   };
 
-  const weekDays = getWeekDays();
+  const weekDays = getWeekDays(weekStart);
   const weekTotal = getWeekTotal();
 
   if (loading && timeEntries.length === 0) {

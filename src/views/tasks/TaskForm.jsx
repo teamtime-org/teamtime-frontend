@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Button, Input } from '@/components/ui';
+import { Info } from 'lucide-react';
+import { Button, Input, ProjectSearchSelect } from '@/components/ui';
 import { useTasks } from '@/hooks/useTasks';
-import { useProjects } from '@/hooks/useProjects';
-import useUsers from '../../hooks/useUsers';
+import { useAllProjects } from '@/hooks/useProjects';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
 import { ROLES, TASK_STATUS, TASK_PRIORITY } from '@/constants';
@@ -12,12 +12,8 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
   const { user } = useAuth();
   const { t } = useTranslation();
   const { createTask, updateTask, loading } = useTasks();
-  const { projects = [] } = useProjects();
-  const { users } = useUsers();
+  const { projects = [] } = useAllProjects();
   const [selectedProject, setSelectedProject] = useState(task?.projectId || '');
-  const [selectedAssignee, setSelectedAssignee] = useState(
-    task?.assignedTo?.id || task?.assignedToId || task?.assignee?.id || task?.assignedTo || ''
-  );
 
   const {
     register,
@@ -30,7 +26,6 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
       title: task?.title || '',
       description: task?.description || '',
       projectId: task?.projectId || '',
-      assignedToId: task?.assignedTo?.id || task?.assignedToId || '',
       status: task?.status || TASK_STATUS.TODO,
       priority: task?.priority || TASK_PRIORITY.MEDIUM,
       dueDate: task?.dueDate ? task.dueDate.split('T')[0] : '',
@@ -43,12 +38,10 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
 
   useEffect(() => {
     if (task) {
-      const assigneeId = task.assignedTo?.id || task.assignedToId || task.assignee?.id || task.assignedTo || '';
       reset({
         title: task.title,
         description: task.description,
         projectId: task.projectId,
-        assignedToId: assigneeId,
         status: task.status,
         priority: task.priority,
         dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
@@ -56,9 +49,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
         tags: task.tags ? task.tags.join(', ') : '',
       });
       setSelectedProject(task.projectId);
-      setSelectedAssignee(assigneeId);
       console.log('TaskForm loaded with task:', task);
-      console.log('Assigned to ID:', assigneeId);
     }
   }, [task]); // Solo depende de task, no de reset // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -68,7 +59,6 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
       console.log('User data:', user);
       console.log('Form data:', data);
       console.log('Selected project:', selectedProject);
-      console.log('Selected assignee:', selectedAssignee);
 
       // Verificar que el usuario esté autenticado y tenga un ID
       if (!user || !user.id) {
@@ -85,15 +75,11 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
       const taskData = {
         ...data,
         projectId: selectedProject,
-        assignedTo: selectedAssignee || null,
         createdBy: user.id, // Asegurar que se incluya el ID del usuario que crea la tarea
-        estimatedHours: parseInt(data.estimatedHours) || 0,
+        estimatedHours: data.estimatedHours ? parseInt(data.estimatedHours) : null,
         dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : null,
         tags: data.tags ? data.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
       };
-
-      // Remover assignedToId si existe en data para evitar conflictos
-      delete taskData.assignedToId;
 
       console.log('Task data to send:', taskData);
 
@@ -123,29 +109,20 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
   const handleProjectChange = (projectId) => {
     setSelectedProject(projectId);
     setValue('projectId', projectId);
-    // Reset assignee when project changes
-    setSelectedAssignee('');
-    setValue('assignedToId', '');
-  };
-
-  const handleAssigneeChange = (assigneeId) => {
-    setSelectedAssignee(assigneeId);
-    setValue('assignedToId', assigneeId);
   };
 
   const isAdmin = user?.role === ROLES.ADMIN;
+  const isCoordinator = user?.role === ROLES.MANAGER || user?.role === ROLES.COORDINADOR;
+  const canEditAllProjects = isAdmin || isCoordinator;
 
-  // Managers can only create tasks in their projects
-  const availableProjects = isAdmin
+  // Admins and coordinators can create tasks in any project, others only in their area projects
+  const availableProjects = canEditAllProjects
     ? projects
     : projects?.filter(project => project.areaId === user?.areaId);
 
-  // Get available assignees - por ahora usamos todos los usuarios
-  // TODO: Filtrar usuarios basado en las asignaciones del proyecto
-  const availableAssignees = users || [];
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-h-[70vh] overflow-y-auto">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="md:col-span-2">
           <Input
@@ -189,122 +166,28 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             {t('project')} <span className="text-red-500">*</span>
           </label>
-          <select
+          <ProjectSearchSelect
+            projects={availableProjects || []}
             value={selectedProject}
-            onChange={(e) => handleProjectChange(e.target.value)}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            onChange={handleProjectChange}
+            placeholder={t('selectProject') || 'Buscar proyecto...'}
             required
-          >
-            <option value="">{t('selectProject')}</option>
-            {availableProjects && availableProjects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
+          />
           {!selectedProject && (
             <p className="text-sm text-red-600 mt-1">{t('projectRequired')}</p>
           )}
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {t('assignedTo')}
-          </label>
-          <div className={`border border-input rounded-md bg-background ${availableAssignees.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
-            }`}>
-            {availableAssignees.length === 0 ? (
-              <div className="p-3 text-sm text-gray-500">
-                {t('noUsersAvailable')}
-              </div>
-            ) : (
-              <div className="max-h-[200px] overflow-y-auto">
-                <div className="p-1">
-                  <label className="flex items-center p-2 rounded cursor-pointer hover:bg-gray-50">
-                    <input
-                      type="radio"
-                      name="assignee"
-                      value=""
-                      checked={selectedAssignee === ''}
-                      onChange={() => handleAssigneeChange('')}
-                      className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                    />
-                    <span className="text-sm text-gray-600">{t('unassigned')}</span>
-                  </label>
-                  {availableAssignees.map((user) => {
-                    // Trabajamos directamente con usuarios
-                    const userId = user.id;
-                    const userName = user.firstName && user.lastName
-                      ? `${user.firstName} ${user.lastName}`
-                      : user.name || `User ${userId}`;
-                    const userEmail = user.email || '';
-                    const userInitial = user.firstName?.charAt(0) || user.name?.charAt(0) || userName?.charAt(0) || '?';
-
-                    if (!userId) {
-                      console.warn('User without valid ID:', user);
-                      return null;
-                    }
-
-                    const isSelected = selectedAssignee === userId;
-                    return (
-                      <label
-                        key={userId}
-                        className={`flex items-center p-2 rounded cursor-pointer hover:bg-gray-50 ${isSelected ? 'bg-blue-50 border border-blue-200' : ''
-                          }`}
-                      >
-                        <input
-                          type="radio"
-                          name="assignee"
-                          value={userId}
-                          checked={isSelected}
-                          onChange={() => handleAssigneeChange(userId)}
-                          className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                        />
-                        <div className="flex items-center flex-1">
-                          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-3">
-                            <span className="text-sm font-medium">
-                              {userInitial}
-                            </span>
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {userName}
-                            </div>
-                            {userEmail && (
-                              <div className="text-xs text-gray-500">
-                                {userEmail}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-          {selectedAssignee && (
-            <div className="mt-2">
-              {(() => {
-                const user = availableAssignees.find(u => u.id === selectedAssignee);
-                if (!user) return null;
-
-                const userName = user.firstName && user.lastName
-                  ? `${user.firstName} ${user.lastName}`
-                  : user.name || `User ${selectedAssignee}`;
-
-                return (
-                  <div className="flex items-center text-sm text-gray-600">
-                    <span className="font-medium">{t('selectedAssignee')}:</span>
-                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800">
-                      {userName}
-                    </span>
-                  </div>
-                );
-              })()}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="flex items-center">
+              <Info className="h-4 w-4 text-blue-500 mr-2" />
+              <p className="text-sm text-blue-700">
+                <strong>Nota:</strong> Los usuarios se asignan al proyecto completo, no a tareas individuales.
+                Los colaboradores asignados al proyecto pueden trabajar en cualquier tarea.
+              </p>
             </div>
-          )}
+          </div>
         </div>
 
         <div>
@@ -339,7 +222,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
 
         <div>
           <Input
-            label={t('estimatedHours')}
+            label={`${t('estimatedHours')} (Opcional)`}
             type="number"
             min="0"
             step="0.5"
@@ -348,7 +231,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
             {...register('estimatedHours', {
               min: {
                 value: 0,
-                message: t('estimatedHoursMin'),
+                message: 'Las horas estimadas no pueden ser negativas',
               },
               max: {
                 value: 1000,
@@ -422,7 +305,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
         </div>
       )}
 
-      <div className="flex items-center justify-end space-x-3 pt-6 border-t">
+      <div className="flex items-center justify-end space-x-3 pt-6 border-t bg-white sticky bottom-0 -mx-6 px-6 -mb-6 pb-6">
         <Button
           type="button"
           variant="outline"

@@ -2,16 +2,16 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button, Input } from '@/components/ui';
 import { useTimesheets } from '@/hooks/useTimesheets';
-import { useTasks } from '@/hooks/useTasks';
-import { useProjects } from '@/hooks/useProjects';
+import { useAssignedTasks } from '@/hooks/useTasks';
+import { useAssignedProjects } from '@/hooks/useProjects';
 import { useAuth } from '@/hooks/useAuth';
 import { ROLES } from '@/constants';
 
 const TimesheetForm = ({ timesheet, onSuccess, onCancel }) => {
   const { user } = useAuth();
   const { createTimesheet, updateTimesheet, loading } = useTimesheets();
-  const { projects = [] } = useProjects();
-  const { tasks = [] } = useTasks();
+  const { projects = [] } = useAssignedProjects();
+  const { tasks = [] } = useAssignedTasks();
   const [selectedProject, setSelectedProject] = useState(timesheet?.projectId || '');
   const [selectedTask, setSelectedTask] = useState(timesheet?.taskId || '');
   const [availableTasks, setAvailableTasks] = useState([]);
@@ -84,12 +84,24 @@ const TimesheetForm = ({ timesheet, onSuccess, onCancel }) => {
   const onSubmit = async (data) => {
     try {
       const timesheetData = {
-        ...data,
         projectId: selectedProject,
-        taskId: selectedTask || null,
         hours: parseFloat(data.hours),
+        date: data.date, // Enviar como string YYYY-MM-DD, no como ISO
+        description: data.description,
+      };
+
+      // Solo incluir taskId si se seleccionó una tarea
+      if (selectedTask) {
+        timesheetData.taskId = selectedTask;
+      }
+
+      // Campos adicionales para el frontend (no van al backend)
+      const frontendData = {
+        ...timesheetData,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        isBreakDeducted: data.isBreakDeducted,
         breakDuration: parseFloat(data.breakDuration) || 0,
-        date: new Date(data.date).toISOString(),
       };
 
       if (timesheet) {
@@ -102,11 +114,8 @@ const TimesheetForm = ({ timesheet, onSuccess, onCancel }) => {
     } catch (error) {
       console.error('Error saving timesheet:', error);
       // Don't close the modal on error, let user try again
-      if (error.message.includes('Backend not available')) {
-        alert('Backend not available. Timesheet functionality is currently disabled.');
-      } else {
-        alert('Error saving timesheet. Please try again.');
-      }
+      const errorMessage = error.response?.data?.message || error.message || 'Error saving timesheet';
+      alert(`Error: ${errorMessage}`);
     }
   };
 
@@ -138,20 +147,18 @@ const TimesheetForm = ({ timesheet, onSuccess, onCancel }) => {
   const isAdmin = user?.role === ROLES.ADMIN;
   const isManager = user?.role === ROLES.MANAGER;
 
-  // Managers can only log time for their projects
-  const availableProjects = isAdmin 
-    ? projects 
-    : projects?.filter(project => project.areaId === user?.areaId);
+  // Use assigned projects directly - they're already filtered by backend
+  const availableProjects = projects;
 
-  // Show message if no projects are available
+  // Show message if no assigned projects are available
   if (!availableProjects || availableProjects.length === 0) {
     return (
       <div className="space-y-4">
         <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-          <h3 className="text-lg font-medium text-yellow-800 mb-2">No Projects Available</h3>
+          <h3 className="text-lg font-medium text-yellow-800 mb-2">Sin Proyectos Asignados</h3>
           <p className="text-yellow-700">
-            You need to have projects available to create timesheet entries. 
-            Please create some projects first or contact your administrator.
+            No tienes proyectos asignados. Para poder registrar horas, necesitas estar asignado a al menos un proyecto.
+            Contacta a tu coordinador o administrador para que te asigne proyectos.
           </p>
         </div>
         <div className="flex items-center justify-end space-x-3">
