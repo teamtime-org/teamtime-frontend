@@ -18,10 +18,13 @@ const useUsers = () => {
 
     try {
       const response = await userService.getUsers(page, limit, search, role);
-      setUsers(response.data?.users || []);
-      setPagination(response.data?.pagination || {
-        page: 1,
-        limit: 10,
+      console.log('Response from userService:', response); // Debug
+      
+      // El servicio ya retorna response.data, así que accedemos directamente
+      setUsers(response?.users || response?.data?.users || []);
+      setPagination(response?.pagination || response?.data?.pagination || {
+        page: page,
+        limit: limit,
         total: 0,
         pages: 0
       });
@@ -40,11 +43,11 @@ const useUsers = () => {
     try {
       // Primero obtenemos el total para saber cuántos usuarios hay
       const initialResponse = await userService.getUsers(1, 1, search, role);
-      const total = initialResponse.data?.total || 0;
+      const total = initialResponse?.pagination?.total || initialResponse?.data?.pagination?.total || 0;
       
       // Luego cargamos todos los usuarios usando el total como límite
       const response = await userService.getUsers(1, Math.max(total, 500), search, role);
-      setUsers(response.data?.users || []);
+      setUsers(response?.users || response?.data?.users || []);
       setPagination({
         page: 1,
         limit: total,
@@ -138,11 +141,11 @@ export const useAllUsers = () => {
       
       // Primero obtenemos el total para saber cuántos usuarios hay
       const initialResponse = await userService.getUsers(1, 1, search, role);
-      const total = initialResponse.data?.total || 0;
+      const total = initialResponse?.pagination?.total || initialResponse?.data?.pagination?.total || 0;
       
       // Luego cargamos todos los usuarios usando el total como límite
       const response = await userService.getUsers(1, Math.max(total, 500), search, role);
-      setUsers(response.data?.users || []);
+      setUsers(response?.users || response?.data?.users || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Error al cargar usuarios');
       setUsers([]);

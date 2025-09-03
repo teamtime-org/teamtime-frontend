@@ -107,6 +107,17 @@ const UsersView = () => {
     fetchUsers(newPage, pagination.limit, searchTerm, roleFilter);
   };
 
+  const handleLimitChange = (newLimit) => {
+    fetchUsers(1, parseInt(newLimit), searchTerm, roleFilter);
+  };
+
+  // Debug info
+  useEffect(() => {
+    console.log('Pagination info:', pagination);
+    console.log('Total users:', pagination.total);
+    console.log('Total pages:', pagination.pages);
+  }, [pagination]);
+
   if (loading && users.length === 0) {
     return <Loading />;
   }
@@ -219,33 +230,132 @@ const UsersView = () => {
           </div>
         )}
 
-        {pagination.pages > 1 && (
-          <div className="flex justify-between items-center px-4 py-3 border-t">
+        {/* Paginación mejorada - siempre visible */}
+        <div className="flex justify-between items-center px-4 py-3 border-t bg-gray-50">
+          <div className="flex items-center space-x-4">
             <div className="text-sm text-gray-700">
-              Mostrando {((pagination.page - 1) * pagination.limit) + 1} a{' '}
+              Mostrando {users.length > 0 ? ((pagination.page - 1) * pagination.limit) + 1 : 0} a{' '}
               {Math.min(pagination.page * pagination.limit, pagination.total)} de{' '}
               {pagination.total} usuarios
             </div>
-            <div className="flex space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(pagination.page - 1)}
-                disabled={pagination.page === 1 || loading}
+            <div className="flex items-center space-x-2">
+              <label className="text-sm text-gray-700">Mostrar:</label>
+              <select
+                value={pagination.limit}
+                onChange={(e) => handleLimitChange(e.target.value)}
+                className="h-8 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                Anterior
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(pagination.page + 1)}
-                disabled={pagination.page === pagination.pages || loading}
-              >
-                Siguiente
-              </Button>
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+              <span className="text-sm text-gray-700">por página</span>
             </div>
           </div>
-        )}
+          
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(1)}
+              disabled={pagination.page === 1 || loading}
+            >
+              Primera
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(pagination.page - 1)}
+              disabled={pagination.page === 1 || loading}
+            >
+              Anterior
+            </Button>
+            
+            {/* Números de página */}
+            {pagination.pages > 1 && (
+              <div className="flex space-x-1">
+                {(() => {
+                  const pages = [];
+                  const maxVisible = 5;
+                  let start = Math.max(1, pagination.page - Math.floor(maxVisible / 2));
+                  let end = Math.min(pagination.pages, start + maxVisible - 1);
+                  
+                  if (end - start < maxVisible - 1) {
+                    start = Math.max(1, end - maxVisible + 1);
+                  }
+                  
+                  if (start > 1) {
+                    pages.push(
+                      <Button
+                        key={1}
+                        variant={pagination.page === 1 ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageChange(1)}
+                        disabled={loading}
+                      >
+                        1
+                      </Button>
+                    );
+                    if (start > 2) {
+                      pages.push(<span key="dots1" className="px-2">...</span>);
+                    }
+                  }
+                  
+                  for (let i = start; i <= end; i++) {
+                    pages.push(
+                      <Button
+                        key={i}
+                        variant={pagination.page === i ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageChange(i)}
+                        disabled={loading}
+                      >
+                        {i}
+                      </Button>
+                    );
+                  }
+                  
+                  if (end < pagination.pages) {
+                    if (end < pagination.pages - 1) {
+                      pages.push(<span key="dots2" className="px-2">...</span>);
+                    }
+                    pages.push(
+                      <Button
+                        key={pagination.pages}
+                        variant={pagination.page === pagination.pages ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageChange(pagination.pages)}
+                        disabled={loading}
+                      >
+                        {pagination.pages}
+                      </Button>
+                    );
+                  }
+                  
+                  return pages;
+                })()}
+              </div>
+            )}
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(pagination.page + 1)}
+              disabled={pagination.page === pagination.pages || loading}
+            >
+              Siguiente
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(pagination.pages)}
+              disabled={pagination.page === pagination.pages || loading}
+            >
+              Última
+            </Button>
+          </div>
+        </div>
       </div>
 
       <UserForm

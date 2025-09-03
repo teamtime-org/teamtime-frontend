@@ -2,6 +2,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
 import { UserProfile, UserStats, QuickActions } from '@/components/ui';
 import WorkloadDashboard from '@/components/dashboard/WorkloadDashboard';
+import AdminDashboard from '@/components/dashboard/AdminDashboard';
+import CoordinatorDashboard from '@/components/dashboard/CoordinatorDashboard';
+import CollaboratorDashboard from '@/components/dashboard/CollaboratorDashboard';
 
 const DashboardView = () => {
   const { user } = useAuth();
@@ -18,6 +21,20 @@ const DashboardView = () => {
       `${user.firstName || ''} ${user.lastName || ''}`.trim() ||
       user.email?.split('@')[0] ||
       'Usuario';
+  };
+
+  // Renderizar dashboard según el rol del usuario
+  const renderDashboardByRole = () => {
+    switch(user?.role) {
+      case 'ADMINISTRADOR':
+        return <AdminDashboard />;
+      case 'COORDINADOR':
+        return <CoordinatorDashboard />;
+      case 'COLABORADOR':
+        return <CollaboratorDashboard />;
+      default:
+        return <WorkloadDashboard />;
+    }
   };
 
   return (
@@ -40,7 +57,10 @@ const DashboardView = () => {
       {/* User Statistics */}
       <UserStats className="w-full" />
       
-      {/* Workload Dashboard */}
+      {/* Role-based Dashboard */}
+      {renderDashboardByRole()}
+      
+      {/* Workload Dashboard - mostrar siempre después del dashboard específico del rol */}
       <WorkloadDashboard />
     </div>
   );
