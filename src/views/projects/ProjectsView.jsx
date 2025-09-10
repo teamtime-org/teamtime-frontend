@@ -97,8 +97,20 @@ const ProjectsView = () => {
     loadAllUsers();
   }, [loadAllUsers]);
 
-  // Establecer el coordinador actual cuando se carguen los coordinadores
+  // Aplicar filtros iniciales al montar el componente
   useEffect(() => {
+    // Limpiar valores vacíos antes de enviar la petición
+    const cleanFilters = Object.fromEntries(
+      Object.entries(filters).filter(([, v]) => v !== '' && v != null)
+    );
+    
+    fetchProjects(cleanFilters);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Establecer el coordinador actual y aplicar filtros iniciales
+  useEffect(() => {
+    let updatedFilters = { ...filters };
+    
     if (coordinators && coordinators.length > 0 && user && isCoordinator) {
       // Buscar el coordinador actual por múltiples criterios
       const currentCoordinator = coordinators.find(coord => {
@@ -119,8 +131,19 @@ const ProjectsView = () => {
       });
       
       if (currentCoordinator && filters.coordinatorId === '') {
-        setFilters(prev => ({ ...prev, coordinatorId: currentCoordinator.id.toString() }));
+        updatedFilters = { ...updatedFilters, coordinatorId: currentCoordinator.id.toString() };
+        setFilters(updatedFilters);
       }
+    }
+    
+    // Limpiar valores vacíos antes de enviar la petición
+    const cleanFilters = Object.fromEntries(
+      Object.entries(updatedFilters).filter(([, v]) => v !== '' && v != null)
+    );
+    
+    // Solo aplicar filtros si hay cambios significativos o es la primera carga
+    if (Object.keys(cleanFilters).length > 0 || !projects.length) {
+      fetchProjects(cleanFilters);
     }
   }, [coordinators, user, isCoordinator]); // eslint-disable-line react-hooks/exhaustive-deps
 

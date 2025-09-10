@@ -65,13 +65,18 @@ const TimesheetMatrix = () => {
     salesManagementId: '',
     salesExecutiveId: '',
     siebelOrderNumber: '',
-    isGeneral: '',
+    isGeneral: isCoordinator ? 'true' : '', // Por defecto "Solo Generales" para coordinadores
   });
 
   // Cargar todos los usuarios para el filtro
   useEffect(() => {
     loadAllUsers();
   }, [loadAllUsers]);
+
+  // Debug: verificar filtros por defecto al montar
+  useEffect(() => {
+    console.log('TimesheetMatrix - Filtros por defecto aplicados:', filters);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Establecer el coordinador actual cuando se carguen los coordinadores
   useEffect(() => {
@@ -139,7 +144,7 @@ const TimesheetMatrix = () => {
       coordinatorId: defaultCoordinatorId, // Mantener el coordinador actual seleccionado
       salesManagementId: '',
       salesExecutiveId: '',
-      isGeneral: '',
+      isGeneral: isCoordinator ? 'true' : '', // Mantener "Solo Generales" para coordinadores
       siebelOrderNumber: '',
     };
     setFilters(emptyFilters);

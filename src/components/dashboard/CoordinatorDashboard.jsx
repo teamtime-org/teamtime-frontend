@@ -109,6 +109,11 @@ const CoordinatorDashboard = () => {
     }
   }, [coordinators, user, isCoordinator]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Cargar datos iniciales con filtros por defecto
+  useEffect(() => {
+    loadDashboardData();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     loadDashboardData();
   }, [selectedProject, filters]); // eslint-disable-line react-hooks/exhaustive-deps
