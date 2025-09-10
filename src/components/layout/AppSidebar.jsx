@@ -57,7 +57,7 @@ const SidebarContent = () => {
       case ROLES.ADMIN:
         return 'Administrador';
       case ROLES.MANAGER:
-        return 'Gerente';
+        return 'Coordinador';
       case ROLES.COLLABORATOR:
         return 'Colaborador';
       default:
@@ -68,9 +68,7 @@ const SidebarContent = () => {
   const navigation = [
     { name: t('dashboard'), href: '/dashboard', icon: Home },
     { name: t('projects'), href: '/projects', icon: FolderOpen },
-    { name: t('tasks'), href: '/tasks', icon: CheckSquare },
     { name: t('timesheet'), href: '/timesheet', icon: Clock },
-    { name: t('reports'), href: '/reports', icon: BarChart3 },
   ];
 
   const adminNavigation = [
@@ -166,7 +164,7 @@ const SidebarContent = () => {
             </div>
           </div>
         </div>
-        
+
         {/* Language Selector */}
         <div className="pt-3">
           <LanguageSelector />
