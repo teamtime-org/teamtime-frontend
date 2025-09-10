@@ -12,7 +12,7 @@ const AppHeader = ({ onMenuClick }) => {
       case ROLES.ADMIN:
         return 'Administrador';
       case ROLES.MANAGER:
-        return 'Gerente';
+        return 'Coordinador';
       case ROLES.COLLABORATOR:
         return 'Colaborador';
       default:
@@ -44,7 +44,7 @@ const AppHeader = ({ onMenuClick }) => {
             type="search"
           />
         </div>
-        
+
         <div className="flex items-center gap-x-4 lg:gap-x-6">
           <Button variant="ghost" size="icon">
             <Bell className="h-5 w-5" />
@@ -71,7 +71,7 @@ const AppHeader = ({ onMenuClick }) => {
                   </span>
                 </div>
               </summary>
-              
+
               <div className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                 <a href="/profile" className="flex px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                   <User className="mr-3 h-4 w-4" />

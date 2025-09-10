@@ -61,14 +61,14 @@ const ProjectsView = () => {
   };
   const [filters, setFilters] = useState({
     search: '',
-    status: '',
+    status: 'ACTIVE', // Por defecto mostrar solo proyectos activos
     priority: '',
     areaId: '',
     // Filtros de asignaciones reales
     assignedUserId: '', // Para usuarios asignados al proyecto
     // Filtros de Excel (mantener para compatibilidad)
     mentorId: '',
-    coordinatorId: '',
+    coordinatorId: '', // Se establecerá cuando se carguen los coordinadores
     salesManagementId: '',
     salesExecutiveId: '',
     siebelOrderNumber: '',
@@ -97,6 +97,33 @@ const ProjectsView = () => {
     loadAllUsers();
   }, [loadAllUsers]);
 
+  // Establecer el coordinador actual cuando se carguen los coordinadores
+  useEffect(() => {
+    if (coordinators && coordinators.length > 0 && user && isCoordinator) {
+      // Buscar el coordinador actual por múltiples criterios
+      const currentCoordinator = coordinators.find(coord => {
+        // Intentar por ID primero
+        if (coord.id === user.id || coord.id === user.userId) {
+          return true;
+        }
+        // Luego por email
+        if (coord.email && user.email && coord.email.toLowerCase() === user.email.toLowerCase()) {
+          return true;
+        }
+        // Finalmente por nombre completo
+        if (coord.firstName && coord.lastName && user.firstName && user.lastName) {
+          return coord.firstName.toLowerCase() === user.firstName.toLowerCase() && 
+                 coord.lastName.toLowerCase() === user.lastName.toLowerCase();
+        }
+        return false;
+      });
+      
+      if (currentCoordinator && filters.coordinatorId === '') {
+        setFilters(prev => ({ ...prev, coordinatorId: currentCoordinator.id.toString() }));
+      }
+    }
+  }, [coordinators, user, isCoordinator]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
@@ -110,21 +137,43 @@ const ProjectsView = () => {
   };
 
   const clearAllFilters = () => {
+    // Buscar el coordinador actual
+    let defaultCoordinatorId = '';
+    if (coordinators && coordinators.length > 0 && user && isCoordinator) {
+      const currentCoordinator = coordinators.find(coord => {
+        // Intentar por ID primero
+        if (coord.id === user.id || coord.id === user.userId) {
+          return true;
+        }
+        // Luego por email
+        if (coord.email && user.email && coord.email.toLowerCase() === user.email.toLowerCase()) {
+          return true;
+        }
+        // Finalmente por nombre completo
+        if (coord.firstName && coord.lastName && user.firstName && user.lastName) {
+          return coord.firstName.toLowerCase() === user.firstName.toLowerCase() && 
+                 coord.lastName.toLowerCase() === user.lastName.toLowerCase();
+        }
+        return false;
+      });
+      defaultCoordinatorId = currentCoordinator?.id?.toString() || '';
+    }
+    
     const emptyFilters = {
       search: '',
-      status: '',
+      status: 'ACTIVE', // Mantener status ACTIVE por defecto
       priority: '',
       areaId: '',
       assignedUserId: '',
       mentorId: '',
-      coordinatorId: '',
+      coordinatorId: defaultCoordinatorId, // Mantener el coordinador actual seleccionado
       salesManagementId: '',
       salesExecutiveId: '',
       isGeneral: '',
       siebelOrderNumber: '',
     };
     setFilters(emptyFilters);
-    fetchProjects({});
+    fetchProjects(emptyFilters);
   };
 
   const handleSort = (column, order) => {

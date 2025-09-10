@@ -8,7 +8,9 @@ import {
   TrendingUp,
   CheckCircle2,
   Calendar,
-  Target
+  Target,
+  Search,
+  Filter
 } from 'lucide-react';
 import {
   KPICard,
@@ -17,15 +19,26 @@ import {
   AreaChart,
   DoughnutChart
 } from '../charts';
+import { Input, Button } from '@/components/ui';
 import { projectService } from '@/services/projectService';
 import { taskService } from '@/services/taskService';
 import userService from '@/services/userService';
 import { timesheetService } from '@/services/timesheetService';
 import { timePeriodService } from '@/services/timePeriodService';
 import { useAuth } from '@/hooks/useAuth';
+import { useAreas } from '@/hooks/useAreas';
+import { useCatalogs } from '@/hooks/useCatalogs';
+import useUsers from '@/hooks/useUsers';
+import { useTranslation } from '@/hooks/useTranslation';
+import { ROLES, PROJECT_STATUS } from '@/constants';
 
 const CoordinatorDashboard = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
+  const { areas } = useAreas();
+  const { salesManagements, mentors, coordinators } = useCatalogs();
+  const { users, fetchAllUsers: loadAllUsers } = useUsers();
+  
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState({
     kpis: {},
@@ -41,10 +54,64 @@ const CoordinatorDashboard = () => {
   const [availablePeriods, setAvailablePeriods] = useState([]);
   const [startPeriodId, setStartPeriodId] = useState('');
   const [endPeriodId, setEndPeriodId] = useState('');
+  
+  // Filtros de proyectos - igual que en ProjectsView
+  const [filters, setFilters] = useState({
+    search: '',
+    status: 'ACTIVE', // Por defecto mostrar solo proyectos activos
+    priority: '',
+    areaId: '',
+    assignedUserId: '',
+    mentorId: '',
+    coordinatorId: '', // Se establecerá cuando se carguen los coordinadores
+    salesManagementId: '',
+    salesExecutiveId: '',
+    siebelOrderNumber: '',
+    isGeneral: '',
+  });
+  
+  const isAdmin = user?.role === ROLES.ADMIN;
+  const isCoordinator = user?.role === ROLES.MANAGER || user?.role === ROLES.COORDINADOR;
+  const isCollaborator = user?.role === ROLES.COLABORADOR;
+
+  // Cargar todos los usuarios para el filtro
+  useEffect(() => {
+    loadAllUsers();
+  }, [loadAllUsers]);
+
+  // Establecer el coordinador actual cuando se carguen los coordinadores
+  useEffect(() => {
+    if (coordinators && coordinators.length > 0 && user && isCoordinator) {
+      // Buscar el coordinador actual por múltiples criterios
+      const currentCoordinator = coordinators.find(coord => {
+        // Intentar por ID primero
+        if (coord.id === user.id || coord.id === user.userId) {
+          return true;
+        }
+        // Luego por email
+        if (coord.email && user.email && coord.email.toLowerCase() === user.email.toLowerCase()) {
+          return true;
+        }
+        // Finalmente por nombre completo
+        if (coord.firstName && coord.lastName && user.firstName && user.lastName) {
+          return coord.firstName.toLowerCase() === user.firstName.toLowerCase() && 
+                 coord.lastName.toLowerCase() === user.lastName.toLowerCase();
+        }
+        return false;
+      });
+      
+      if (currentCoordinator && filters.coordinatorId === '') {
+        console.log('Coordinador encontrado:', currentCoordinator);
+        setFilters(prev => ({ ...prev, coordinatorId: currentCoordinator.id.toString() }));
+      } else if (!currentCoordinator && isCoordinator) {
+        console.log('No se encontró el coordinador actual en la lista', { user, coordinators });
+      }
+    }
+  }, [coordinators, user, isCoordinator]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     loadDashboardData();
-  }, [selectedProject]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedProject, filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (startPeriodId && endPeriodId) {
@@ -72,14 +139,64 @@ const CoordinatorDashboard = () => {
     }
   };
 
+  const handleFilterChange = (key, value) => {
+    const newFilters = { ...filters, [key]: value };
+    setFilters(newFilters);
+  };
+
+  const clearAllFilters = () => {
+    // Buscar el coordinador actual
+    let defaultCoordinatorId = '';
+    if (coordinators && coordinators.length > 0 && user && isCoordinator) {
+      const currentCoordinator = coordinators.find(coord => {
+        // Intentar por ID primero
+        if (coord.id === user.id || coord.id === user.userId) {
+          return true;
+        }
+        // Luego por email
+        if (coord.email && user.email && coord.email.toLowerCase() === user.email.toLowerCase()) {
+          return true;
+        }
+        // Finalmente por nombre completo
+        if (coord.firstName && coord.lastName && user.firstName && user.lastName) {
+          return coord.firstName.toLowerCase() === user.firstName.toLowerCase() && 
+                 coord.lastName.toLowerCase() === user.lastName.toLowerCase();
+        }
+        return false;
+      });
+      defaultCoordinatorId = currentCoordinator?.id?.toString() || '';
+    }
+    
+    const emptyFilters = {
+      search: '',
+      status: 'ACTIVE', // Mantener status ACTIVE por defecto
+      priority: '',
+      areaId: '',
+      assignedUserId: '',
+      mentorId: '',
+      coordinatorId: defaultCoordinatorId, // Mantener el coordinador actual seleccionado
+      salesManagementId: '',
+      salesExecutiveId: '',
+      isGeneral: '',
+      siebelOrderNumber: '',
+    };
+    setFilters(emptyFilters);
+  };
+
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      // Cargar proyectos del coordinador
+      // Limpiar valores vacíos antes de enviar la petición
+      const cleanFilters = Object.fromEntries(
+        Object.entries(filters).filter(([, v]) => v !== '' && v != null)
+      );
+      
+      // Cargar proyectos del coordinador con filtros
       const projectsRes = await projectService.getAll({ 
         page: 1, 
         limit: 100, 
-        assignedUserId: user.userId 
+        assignedUserId: user.userId,
+        ...cleanFilters
       });
       const myProjects = projectsRes.data?.projects || projectsRes.projects || [];
       setProjects(myProjects);
@@ -345,29 +462,169 @@ const CoordinatorDashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header con selector de proyecto */}
+      {/* Header */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Dashboard de Coordinación</h2>
             <p className="text-gray-600 mt-1">Gestión de proyectos y equipo</p>
           </div>
-          {projects.length > 0 && (
+        </div>
+      </div>
+
+      {/* Filtros de proyectos - igual que en ProjectsView */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <Filter className="h-5 w-5 mr-2" />
+          Filtros de Proyectos
+        </h3>
+        <div className="space-y-4">
+          {/* Primera fila de filtros */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Buscar proyectos..."
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
             <select
-              value={selectedProject?.id || ''}
-              onChange={(e) => {
-                const project = projects.find(p => p.id === parseInt(e.target.value));
-                setSelectedProject(project);
-              }}
-              className="rounded-lg border border-gray-300 px-4 py-2"
+              value={filters.status}
+              onChange={(e) => handleFilterChange('status', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="">Todos los proyectos</option>
-              {projects.map(project => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
+              <option value="">Todos los Status</option>
+              <option value="ACTIVE">{t('active')}</option>
+              <option value="COMPLETED">{t('completed')}</option>
+              <option value="ON_HOLD">{t('onHold')}</option>
+              <option value="CANCELLED">{t('cancelled')}</option>
+              <option value="AWARDED">Ganado</option>
             </select>
+
+            <select
+              value={filters.priority}
+              onChange={(e) => handleFilterChange('priority', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Todas las Prioridades</option>
+              <option value="LOW">{t('low')}</option>
+              <option value="MEDIUM">{t('medium')}</option>
+              <option value="HIGH">{t('high')}</option>
+              <option value="URGENT">{t('urgent')}</option>
+            </select>
+
+            {(isAdmin || isCoordinator) ? (
+              <select
+                value={filters.areaId}
+                onChange={(e) => handleFilterChange('areaId', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Todas las Áreas</option>
+                {areas && areas.map((area) => (
+                  <option key={area.id} value={area.id}>
+                    {area.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select
+                value={filters.areaId}
+                onChange={(e) => handleFilterChange('areaId', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Mi Área</option>
+                {areas && areas.filter(area => area.id === user?.areaId).map((area) => (
+                  <option key={area.id} value={area.id}>
+                    {area.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Segunda fila de filtros - Solo para administradores y coordinadores */}
+          {!isCollaborator && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
+              <select
+                value={filters.assignedUserId}
+                onChange={(e) => handleFilterChange('assignedUserId', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Usuarios Asignados</option>
+                <option value="me">Mis Proyectos</option>
+                {users && users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.firstName} {user.lastName}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={filters.mentorId}
+                onChange={(e) => handleFilterChange('mentorId', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Todos los Mentores</option>
+                {mentors && mentors.map((mentor) => (
+                  <option key={mentor.id} value={mentor.id}>
+                    {mentor.firstName} {mentor.lastName}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={filters.coordinatorId}
+                onChange={(e) => handleFilterChange('coordinatorId', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Todos los Coordinadores</option>
+                {coordinators && coordinators.map((coordinator) => (
+                  <option key={coordinator.id} value={coordinator.id}>
+                    {coordinator.firstName} {coordinator.lastName}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={filters.salesManagementId}
+                onChange={(e) => handleFilterChange('salesManagementId', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Todas las Gerencias</option>
+                {salesManagements && salesManagements.map((management) => (
+                  <option key={management.id} value={management.id}>
+                    {management.name}
+                  </option>
+                ))}
+              </select>
+
+              <Input
+                placeholder="Orden Siebel..."
+                value={filters.siebelOrderNumber}
+                onChange={(e) => handleFilterChange('siebelOrderNumber', e.target.value)}
+              />
+
+              <select
+                value={filters.isGeneral}
+                onChange={(e) => handleFilterChange('isGeneral', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Todos los Tipos</option>
+                <option value="true">Solo Generales</option>
+                <option value="false">Solo Específicos</option>
+              </select>
+
+              <Button
+                variant="outline"
+                onClick={clearAllFilters}
+                className="whitespace-nowrap"
+              >
+                Limpiar Filtros
+              </Button>
+            </div>
           )}
         </div>
       </div>
