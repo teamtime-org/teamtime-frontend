@@ -24,24 +24,24 @@ const UserStats = ({ className = "" }) => {
 
   const loadUserStats = async () => {
     if (!userId) return;
-    
+
     try {
       setStats(prev => ({ ...prev, loading: true }));
-      
+
       // Cargar datos en paralelo
       const [projectsData, tasksData, hoursData] = await Promise.all([
         // Proyectos asignados al usuario
         projectService.getAll({ assigned: true, limit: 1000 }).catch(() => ({ data: { projects: [] } })),
-        
+
         // Tareas asignadas al usuario
         taskService.getAll({ assigned: true, limit: 1000 }).catch(() => ({ data: { tasks: [] } })),
-        
+
         // Horas de esta semana
         getThisWeekHours().catch(() => 0)
       ]);
 
       const totalProjects = projectsData.data?.projects?.length || 0;
-      const activeTasks = tasksData.data?.tasks?.filter(task => 
+      const activeTasks = tasksData.data?.tasks?.filter(task =>
         task.status === 'TODO' || task.status === 'IN_PROGRESS'
       ).length || 0;
 
@@ -49,8 +49,8 @@ const UserStats = ({ className = "" }) => {
         totalProjects,
         activeTasks,
         hoursThisWeek: hoursData,
-        teamMembers: user.role === 'ADMINISTRADOR' ? '∞' : 
-                    user.role === 'COORDINADOR' ? '5-10' : '1',
+        teamMembers: user.role === 'ADMINISTRADOR' ? '∞' :
+          user.role === 'COORDINADOR' ? '5-10' : '1',
         loading: false
       });
     } catch (error) {
@@ -64,18 +64,18 @@ const UserStats = ({ className = "" }) => {
       const now = new Date();
       const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1)); // Lunes
       const endOfWeek = new Date(now.setDate(startOfWeek.getDate() + 6)); // Domingo
-      
+
       const startDate = startOfWeek.toISOString().split('T')[0];
       const endDate = endOfWeek.toISOString().split('T')[0];
-      
+
       const response = await timesheetService.getTimeEntries({
         userId: userId,
         startDate,
         endDate
       });
-      
+
       if (response.data?.timeEntries) {
-        return response.data.timeEntries.reduce((total, entry) => 
+        return response.data.timeEntries.reduce((total, entry) =>
           total + (parseFloat(entry.hours) || 0), 0
         );
       }
@@ -89,7 +89,7 @@ const UserStats = ({ className = "" }) => {
   const getStatConfig = () => {
     const baseStats = [
       {
-        title: 'Proyectos Asignados',
+        title: 'Proyectos Activos',
         value: stats.loading ? '...' : stats.totalProjects.toString(),
         icon: FolderOpen,
         color: 'text-blue-600',

@@ -52,7 +52,8 @@ const DoughnutChart = ({
             const value = context.parsed;
             const total = context.dataset.data.reduce((a, b) => a + b, 0);
             const percentage = ((value / total) * 100).toFixed(1);
-            return `${label}: ${value} (${percentage}%)`;
+            const formattedValue = Math.round(value * 10) / 10; // Redondear a 1 decimal
+            return `${label}: ${formattedValue}h (${percentage}%)`;
           }
         }
       },

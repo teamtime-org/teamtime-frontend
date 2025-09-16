@@ -26,10 +26,10 @@ const dashboardService = {
   },
 
   // Dashboard Colaborador
-  getCollaboratorDashboard: async (userId, filters = {}) => {
+  getCollaboratorDashboard: async (filters = {}) => {
     try {
       const params = new URLSearchParams(filters).toString();
-      const response = await api.get(`/dashboard/collaborator/${userId}?${params}`);
+      const response = await api.get(`/dashboard/collaborator?${params}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching collaborator dashboard:', error);

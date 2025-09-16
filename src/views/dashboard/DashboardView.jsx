@@ -54,8 +54,8 @@ const DashboardView = () => {
         <QuickActions className="lg:col-span-2" />
       </div>
 
-      {/* User Statistics */}
-      <UserStats className="w-full" />
+      {/* User Statistics - Removed per user request */}
+      {/* <UserStats className="w-full" /> */}
       
       {/* Role-based Dashboard */}
       {renderDashboardByRole()}

@@ -41,12 +41,32 @@ const CoordinatorDashboard = () => {
   
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState({
-    kpis: {},
-    projectStatus: {},
-    teamWorkload: {},
-    burndown: {},
-    hoursApproval: {},
-    taskDistribution: {}
+    kpis: {
+      totalProjects: 0,
+      totalGeneralProjects: 0,
+      totalSpecificProjects: 0,
+      totalCollaborators: 0,
+      pendingTasks: 0,
+      pendingHours: 0,
+      averageProgress: 0,
+      projectsAtRisk: 0,
+      teamEfficiency: 0,
+      upcomingDeadlines: 0
+    },
+    projectStatus: { labels: [], values: [], colors: [] },
+    teamWorkload: {
+      combined: { labels: [], datasets: [], referenceLine: { value: 0, label: '' }, collaborators: [] },
+      general: { labels: [], datasets: [], referenceLine: { value: 0, label: '' }, collaborators: [] },
+      specific: { labels: [], datasets: [], referenceLine: { value: 0, label: '' }, collaborators: [] }
+    },
+    burndown: { labels: [], ideal: [], actual: [], projected: [] },
+    hoursApproval: { labels: [], datasets: [] },
+    taskDistribution: { labels: [], values: [] },
+    projectDistribution: {
+      combined: { labels: [], values: [] },
+      general: { labels: [], values: [] },
+      specific: { labels: [], values: [] }
+    }
   });
   const [selectedProject, setSelectedProject] = useState(null);
   const [projects, setProjects] = useState([]);
@@ -225,22 +245,25 @@ const CoordinatorDashboard = () => {
       // Las hojas de tiempo se simulan por ahora
       const timesheets = [];
 
-      // Calcular KPIs
-      const totalProjects = myProjects.length;
-      const totalGeneralProjects = generalProjects.length;
-      const totalSpecificProjects = specificProjects.length;
-      const totalCollaborators = teamMembers.length;
-      const pendingTasks = tasks.filter(t => t.status === 'pending').length;
-      const pendingHours = timesheets.filter(t => t.status === 'pending').reduce((sum, t) => sum + t.hours, 0);
-      const averageProgress = myProjects.reduce((sum, p) => sum + (p.progress || 0), 0) / myProjects.length;
-      const projectsAtRisk = myProjects.filter(p => p.riskLevel === 'high').length;
+      // Calcular KPIs - solo contar proyectos activos con valores por defecto seguros
+      const activeProjects = myProjects.filter(p => p.status === 'ACTIVE') || [];
+      const totalProjects = activeProjects.length || 0;
+      const totalGeneralProjects = generalProjects.filter(p => p.status === 'ACTIVE').length || 0;
+      const totalSpecificProjects = specificProjects.filter(p => p.status === 'ACTIVE').length || 0;
+      const totalCollaborators = teamMembers.length || 0;
+      const pendingTasks = tasks.filter(t => t.status === 'pending').length || 0;
+      const pendingHours = timesheets.filter(t => t.status === 'pending').reduce((sum, t) => sum + (t.hours || 0), 0) || 0;
+      const averageProgress = myProjects.length > 0 ? 
+        Math.round(myProjects.reduce((sum, p) => sum + (p.progress || 0), 0) / myProjects.length) : 0;
+      const projectsAtRisk = myProjects.filter(p => p.riskLevel === 'high').length || 0;
       const teamEfficiency = 89; // Placeholder - calcular basado en datos reales
       const upcomingDeadlines = tasks.filter(t => {
+        if (!t.dueDate) return false;
         const dueDate = new Date(t.dueDate);
         const today = new Date();
         const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
         return diffDays >= 0 && diffDays <= 7;
-      }).length;
+      }).length || 0;
 
       // Estado de proyectos (Kanban)
       const projectStatus = {
@@ -437,8 +460,8 @@ const CoordinatorDashboard = () => {
           totalSpecificProjects,
           totalCollaborators,
           pendingTasks,
-          pendingHours: Math.round(pendingHours),
-          averageProgress: Math.round(averageProgress),
+          pendingHours: Math.round(pendingHours) || 0,
+          averageProgress: Math.round(averageProgress) || 0,
           projectsAtRisk,
           teamEfficiency,
           upcomingDeadlines
@@ -637,7 +660,7 @@ const CoordinatorDashboard = () => {
       {/* KPI Cards - Primera fila */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KPICard
-          title="Mis Proyectos"
+          title="Proyectos Activos"
           value={dashboardData.kpis.totalProjects}
           icon={FolderOpen}
           color="indigo"
@@ -647,14 +670,6 @@ const CoordinatorDashboard = () => {
           value={dashboardData.kpis.totalCollaborators}
           icon={Users}
           color="blue"
-        />
-        <KPICard
-          title="Tareas Pendientes"
-          value={dashboardData.kpis.pendingTasks}
-          icon={ListChecks}
-          color="yellow"
-          trend="down"
-          trendValue={-15}
         />
         <KPICard
           title="Horas Pendientes"

@@ -146,7 +146,8 @@ const TimePeriodsView = () => {
 
       const response = await timePeriodService.createBulk(periodsToSave);
       
-      showMessage(`${response.data.created} períodos creados exitosamente`, 'success');
+      const createdCount = response.data?.created?.length || response.data?.length || previewPeriods.length;
+      showMessage(`${createdCount} períodos creados exitosamente`, 'success');
       
       // Limpiar preview y recargar existentes
       setPreviewPeriods([]);
