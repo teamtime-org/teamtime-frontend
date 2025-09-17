@@ -1,4 +1,4 @@
-import { cn } from '@/utils';
+import { cn } from '@/utils/cn';
 
 const Loading = ({ size = 'default', className }) => {
   const sizes = {

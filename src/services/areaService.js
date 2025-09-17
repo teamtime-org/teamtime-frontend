@@ -1,9 +1,17 @@
 import api from './api';
 
-export const areaService = {
+const areaService = {
   getAll: async () => {
     const response = await api.get('/areas');
     return response.data;
+  },
+
+  // Alias para compatibilidad con vistas que usan getAreas
+  getAreas: async () => {
+    const response = await api.get('/areas');
+    const result = response.data.data?.areas || response.data.data || response.data;
+    // Asegurar que siempre se devuelva un array
+    return Array.isArray(result) ? result : [];
   },
 
   getById: async (id) => {
@@ -41,3 +49,6 @@ export const areaService = {
     return response.data;
   },
 };
+
+export { areaService };
+export default areaService;

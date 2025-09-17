@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { cn } from '@/utils';
+import { cn } from '@/utils/cn';
 
 const Badge = forwardRef(({ className, variant = 'default', ...props }, ref) => {
   const variants = {
@@ -26,4 +26,5 @@ const Badge = forwardRef(({ className, variant = 'default', ...props }, ref) => 
 
 Badge.displayName = 'Badge';
 
+export { Badge };
 export default Badge;

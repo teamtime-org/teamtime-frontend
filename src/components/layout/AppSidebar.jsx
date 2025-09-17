@@ -10,6 +10,12 @@ import {
   BarChart3,
   Settings,
   Calendar,
+  GitBranch,
+  Map,
+  Database,
+  ArrowRightLeft,
+  FileText,
+  Upload,
   X
 } from 'lucide-react';
 import { cn } from '@/utils';
@@ -76,6 +82,12 @@ const SidebarContent = () => {
     { name: t('areas'), href: '/areas', icon: Building },
     { name: 'Períodos de Tiempo', href: '/admin/time-periods', icon: Calendar },
     { name: 'Configuración Sistema', href: '/admin/system-config', icon: Settings },
+    { name: 'Flujos de Áreas', href: '/admin/area-flows', icon: GitBranch },
+    { name: 'Mapeo de Campos', href: '/admin/field-mappings', icon: Map },
+    { name: 'Proyectos en Staging', href: '/admin/staging-projects', icon: Database },
+    { name: 'Transferencias de Proyectos', href: '/admin/project-transfers', icon: ArrowRightLeft },
+    { name: 'Generación de Documentos', href: '/admin/document-generation', icon: FileText },
+    { name: 'Importación Excel V2', href: '/projects/import-v2', icon: Upload },
   ];
 
   return (

@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { cn } from '@/utils';
+import { cn } from '@/utils/cn';
 
 const Input = forwardRef(({ 
   className, 
@@ -40,4 +40,5 @@ const Input = forwardRef(({
 
 Input.displayName = 'Input';
 
+export { Input };
 export default Input;

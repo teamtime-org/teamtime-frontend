@@ -49,7 +49,7 @@ const ExcelImportView = () => {
   const loadStats = async () => {
     try {
       setLoadingStats(true);
-      const response = await api.get('/excel-import/stats');
+      const response = await api.get('/excel-import/statistics');
       setStats(response.data.data);
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -113,9 +113,9 @@ const ExcelImportView = () => {
       
       const formData = new FormData();
       formData.append('excelFile', selectedFile);
-      formData.append('areaId', selectedArea);
+      formData.append('sourceAreaId', selectedArea);
 
-      const response = await api.post('/excel-import/upload', formData, {
+      const response = await api.post('/excel-import/staging', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -519,19 +519,24 @@ const ExcelImportView = () => {
               <div>
                 <h4 className="font-medium text-gray-900 mb-3">Errores Encontrados</h4>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {importResult.errorDetails.map((error, index) => (
-                    <div key={index} className="p-3 bg-red-50 border border-red-200 rounded">
-                      <div className="flex items-start">
-                        <XCircle className="h-4 w-4 text-red-500 mt-0.5 mr-2 flex-shrink-0" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-red-800">
-                            Fila {error.row}
-                          </p>
-                          <p className="text-sm text-red-600">{error.error}</p>
+                  {importResult.errorDetails.map((error, index) => {
+                    // Handle different error formats from backend
+                    const errorMessage = error.error || (Array.isArray(error.errors) ? error.errors.join(', ') : error.errors) || 'Error desconocido';
+
+                    return (
+                      <div key={index} className="p-3 bg-red-50 border border-red-200 rounded">
+                        <div className="flex items-start">
+                          <XCircle className="h-4 w-4 text-red-500 mt-0.5 mr-2 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-red-800">
+                              Fila {error.row}
+                            </p>
+                            <p className="text-sm text-red-600">{errorMessage}</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

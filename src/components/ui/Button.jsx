@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { cn } from '@/utils';
+import { cn } from '@/utils/cn';
 
 const Button = forwardRef(({ 
   className, 
@@ -52,4 +52,5 @@ const Button = forwardRef(({
 
 Button.displayName = 'Button';
 
+export { Button };
 export default Button;

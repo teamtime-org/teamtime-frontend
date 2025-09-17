@@ -1,6 +1,6 @@
 import api from './api';
 
-export const projectService = {
+const projectService = {
   getAll: async (params = {}) => {
     const searchParams = new URLSearchParams();
     
@@ -92,3 +92,6 @@ export const projectService = {
     return response.data;
   },
 };
+
+export { projectService };
+export default projectService;
